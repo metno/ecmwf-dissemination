@@ -14,7 +14,6 @@ source deps/bin/activate
 Next, install the ECMWF daemons and their dependencies in the virtual environment:
 
 ```
-cd ecmwf
 python setup.py develop
 ```
 

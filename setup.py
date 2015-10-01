@@ -10,7 +10,7 @@ config = {
     'download_url': 'https://gitlab.met.no/it-geo/ecmwf-dissemination',
     'author_email': 'it-geo-tf@met.no',
     'version': '0.1',
-    'install_requires': ['nose', 'inotify'],
+    'install_requires': ['nose', 'inotify', 'requests', 'pyzmq'],
     'packages': [],
     'scripts': [],
     'name': 'ecdiss'
