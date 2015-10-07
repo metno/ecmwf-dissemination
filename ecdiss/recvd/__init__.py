@@ -1,7 +1,13 @@
 import os
+import hashlib
 import inotify.adapters
 
+READ_BUFFER = 8192
+
 class EcdissException(Exception):
+    pass
+
+class InvalidDataException(EcdissException):
     pass
 
 class Dataset(object):
@@ -13,6 +19,8 @@ class Dataset(object):
         paths = self._derive_paths(path)
         self.data_path = paths['data']
         self.md5_path = paths['md5']
+        self.md5_key = None
+        self.md5_result = None
 
     def _derive_paths(self, path):
         """
@@ -62,6 +70,69 @@ class Dataset(object):
         Returns True if both files in the dataset exists, False otherwise.
         """
         return self.has_data_file() and self.has_md5_file()
+
+    def read_md5sum(self):
+        """
+        Read the contents of the md5sum file into memory.
+        """
+        if not self.has_md5_file():
+            raise EcdissException('Cannot read md5sum without an md5sum file')
+        with open(self.md5_path, 'r') as f:
+            self.md5_key = f.read(32)
+            if len(self.md5_key) != 32:
+                raise InvalidDataException('md5sum file is less than 32 bytes')
+
+    def calculate_md5sum(self):
+        """
+        Calculate the md5sum of the data file.
+        """
+        h = hashlib.md5()
+        if not self.has_data_file():
+            raise EcdissException('Cannot calculate md5sum without a data file')
+        with open(self.data_path, 'r') as f:
+            while True:
+                data = f.read(READ_BUFFER)
+                if len(data) == 0:
+                    break
+                h.update(data)
+        self.md5_result = h.hexdigest()
+
+    def valid(self):
+        """
+        Returns True if md5sum matches data file contents
+        """
+        if not self.md5_key:
+            self.read_md5sum()
+        if not self.md5_result:
+            self.calculate_md5sum()
+        return self.md5_key == self.md5_result
+
+    def move(self, destination):
+        """
+        Move the dataset to a different directory
+        """
+        if not self.complete():
+            raise EcdissException('Dataset must be complete before moving it')
+        for member in ['data_path', 'md5_path']:
+            path = getattr(self, member)
+            destination_path = os.path.join(destination, os.path.basename(path))
+            os.rename(path, destination_path)
+            setattr(self, member, destination_path)
+
+    def __repr__(self):
+        """
+        Return a textual representation of this dataset
+        """
+        text = 'Dataset at %s' % self.data_path
+        if self.complete():
+            text += ' (complete)'
+        elif self.has_data_file() and not self.has_md5_file():
+            text += ' (missing md5sum)'
+        elif self.has_md5_file() and not self.has_data_file():
+            text += ' (missing data file)'
+        else:
+            text += ' (missing)'
+        return text
 
 
 class DirectoryWatch(object):
