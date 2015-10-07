@@ -4,11 +4,14 @@ import inotify.adapters
 
 READ_BUFFER = 8192
 
+
 class EcdissException(Exception):
     pass
 
+
 class InvalidDataException(EcdissException):
     pass
+
 
 class Dataset(object):
     """
@@ -99,7 +102,7 @@ class Dataset(object):
 
     def valid(self):
         """
-        Returns True if md5sum matches data file contents
+        Returns True if md5sum matches data file contents.
         """
         if not self.md5_key:
             self.read_md5sum()
@@ -109,7 +112,7 @@ class Dataset(object):
 
     def move(self, destination):
         """
-        Move the dataset to a different directory
+        Move the dataset to a different directory.
         """
         if not self.complete():
             raise EcdissException('Dataset must be complete before moving it')
@@ -121,18 +124,22 @@ class Dataset(object):
 
     def __repr__(self):
         """
-        Return a textual representation of this dataset
+        Return a textual representation of this dataset.
         """
-        text = 'Dataset at %s' % self.data_path
+        return 'Dataset at %s' % self.data_path
+
+    def state(self):
+        """
+        Return a textual representation of the dataset state.
+        """
         if self.complete():
-            text += ' (complete)'
+            return 'complete'
         elif self.has_data_file() and not self.has_md5_file():
-            text += ' (missing md5sum)'
+            return 'missing md5sum'
         elif self.has_md5_file() and not self.has_data_file():
-            text += ' (missing data file)'
+            return 'missing data file'
         else:
-            text += ' (missing)'
-        return text
+            return 'missing'
 
 
 class DirectoryWatch(object):
