@@ -1,5 +1,7 @@
 import os
 import hashlib
+import datetime
+import dateutil.tz
 import inotify.adapters
 
 READ_BUFFER = 8192
@@ -110,6 +112,12 @@ class Dataset(object):
             self.calculate_md5sum()
         return self.md5_key == self.md5_result
 
+    def data_filename(self):
+        """
+        Return the filename part of the data file path.
+        """
+        return os.path.basename(self.data_path)
+
     def move(self, destination):
         """
         Move the dataset to a different directory.
@@ -140,6 +148,27 @@ class Dataset(object):
             return 'missing data file'
         else:
             return 'missing'
+
+    def reference_time(self):
+        """
+        Return the model reference time for this dataset.
+        """
+        # FIXME: mock data!
+        return datetime.datetime.utcnow().replace(tzinfo=dateutil.tz.tzutc())
+
+    def data_provider(self):
+        """
+        Return the data provider name of this dataset.
+        """
+        # FIXME: mock data!
+        return 'mock data'
+
+    def file_type(self):
+        """
+        Return the file type of this dataset.
+        """
+        # FIXME: mock data!
+        return 'grib'
 
 
 class DirectoryWatch(object):

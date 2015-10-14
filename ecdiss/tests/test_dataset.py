@@ -3,6 +3,7 @@ import tempfile
 import os
 
 from nose.tools import with_setup, raises
+from unittest.case import SkipTest
 
 dataset = None
 
@@ -267,3 +268,24 @@ def test_move_incomplete_dataset():
     Test that moving an incomplete dataset throws an exception.
     """
     dataset.move('/tmp')
+
+
+def test_reference_time():
+    """
+    Test that the correct dataset reference time is returned.
+    """
+    raise SkipTest('reference_time() only implemented as mock function')
+
+
+def test_data_provider():
+    """
+    Test that the correct dataset data provider is returned.
+    """
+    raise SkipTest('data_provider() only implemented as mock function')
+
+
+def test_file_type():
+    """
+    Test that the correct dataset file type is returned.
+    """
+    raise SkipTest('file_type() only implemented as mock function')
