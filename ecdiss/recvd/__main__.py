@@ -42,6 +42,7 @@ def main():
         args.verify_ssl,
     )
 
+    daemon.process_directory(args.input)
     daemon.main()
 
 

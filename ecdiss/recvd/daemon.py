@@ -1,5 +1,6 @@
 import os
 import logging
+import glob
 
 import modelstatus
 import modelstatus.exceptions
@@ -152,6 +153,16 @@ class Daemon(object):
             return
         full_path = os.path.join(path, filename)
         return self.process_file(full_path)
+
+    def process_directory(self, directory):
+        """
+        Process all files in a directory.
+        """
+        logging.info('%s: processing directory' % directory)
+        files = glob.iglob(os.path.join(directory, '*.md5'))
+        for f in files:
+            self.process_file(f)
+        logging.info('%s: finished processing directory' % directory)
 
     def main(self):
         """
