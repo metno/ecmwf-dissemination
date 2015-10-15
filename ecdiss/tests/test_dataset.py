@@ -270,22 +270,81 @@ def test_move_incomplete_dataset():
     dataset.move('/tmp')
 
 
-def test_reference_time():
+def test_force_utc():
+    """
+    Test that a naive timestamp is successfully converted into UTC.
+    """
+    raise SkipTest()
+
+
+def test_force_utc_with_timezone():
+    """
+    Test that a timestamp with timezone is untouched by UTC conversion.
+    """
+    raise SkipTest()
+
+
+def test_open_grib():
+    """
+    Test that a GRIB file can be successfully opened and parsed.
+    """
+    raise SkipTest()
+
+
+def test_open_grib_no_data_file():
+    """
+    Test that a opening a GRIB file throws an exception when the data set is missing.
+    """
+    raise SkipTest()
+
+
+def test_open_grib_empty():
+    """
+    Test that a opening an empty GRIB file throws an exception.
+    """
+    raise SkipTest()
+
+
+def test_reference_times():
     """
     Test that the correct dataset reference time is returned.
     """
-    raise SkipTest('reference_time() only implemented as mock function')
+    raise SkipTest()
 
 
-def test_data_provider():
+def test_reference_times_missing_dataset():
+    """
+    Test that an exception is thrown when trying to read reference times from a
+    non-existant data set.
+    """
+    raise SkipTest()
+
+
+def test_data_providers():
     """
     Test that the correct dataset data provider is returned.
     """
-    raise SkipTest('data_provider() only implemented as mock function')
+    raise SkipTest()
+
+
+def test_data_providers_missing_dataset():
+    """
+    Test that an exception is thrown when trying to read data providers from a
+    non-existant data set.
+    """
+    raise SkipTest()
 
 
 def test_file_type():
     """
     Test that the correct dataset file type is returned.
     """
-    raise SkipTest('file_type() only implemented as mock function')
+    raise SkipTest()
+
+
+def test_file_type_missing_dataset():
+    """
+    Test that an exception is thrown when trying to read the file type from a
+    non-existant data set.
+    """
+    raise SkipTest()

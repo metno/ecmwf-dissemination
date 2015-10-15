@@ -1,8 +1,8 @@
 import os
 import hashlib
-import datetime
 import dateutil.tz
 import inotify.adapters
+import pygrib
 
 READ_BUFFER = 8192
 
@@ -26,6 +26,8 @@ class Dataset(object):
         self.md5_path = paths['md5']
         self.md5_key = None
         self.md5_result = None
+        self.grib_reader = None
+        self.grib_data = None
 
     def _derive_paths(self, path):
         """
@@ -112,6 +114,19 @@ class Dataset(object):
             self.calculate_md5sum()
         return self.md5_key == self.md5_result
 
+    def open_grib(self):
+        """
+        Open the data file as a GRIB object.
+        """
+        if self.grib_reader:
+            return
+        if not self.has_data_file():
+            raise EcdissException('Cannot get GRIB file handle: missing data file at %s' % self.data_path)
+        self.grib_reader = pygrib.open(self.data_path)
+        self.grib_data = self.grib_reader.read()
+        if len(self.grib_data) == 0:
+            raise EcdissException('GRIB data set is empty')
+
     def data_filename(self):
         """
         Return the filename part of the data file path.
@@ -149,26 +164,42 @@ class Dataset(object):
         else:
             return 'missing'
 
-    def reference_time(self):
+    def force_utc(self, timestamp):
         """
-        Return the model reference time for this dataset.
+        Force a "naive" timestamp into UTC, or return the original timestamp
+        for sane timestamps.
         """
-        # FIXME: mock data!
-        return datetime.datetime.utcnow().replace(tzinfo=dateutil.tz.tzutc())
+        if not timestamp.tzinfo:
+            return timestamp.replace(tzinfo=dateutil.tz.tzutc())
+        return timestamp
 
-    def data_provider(self):
+    def reference_times(self):
+        """
+        Return a list of model reference timestamps for this dataset.
+        """
+        self.open_grib()
+        return list(set(sorted([self.force_utc(grib.analDate) for grib in self.grib_data])))
+
+    def data_providers(self):
         """
         Return the data provider name of this dataset.
+        Data provider names are not normalized, but consists of a combination
+        of generating center and generating process.
         """
-        # FIXME: mock data!
-        return 'mock data'
+        self.open_grib()
+        providers = [[grib.centre, grib.generatingProcessIdentifier] for grib in self.grib_data]
+        return list(set(sorted(['%s.%s' % (x[0], x[1]) for x in providers])))
 
     def file_type(self):
         """
         Return the file type of this dataset.
         """
-        # FIXME: mock data!
-        return 'grib'
+        try:
+            self.open_grib()
+            return 'grib'
+        except EcdissException:
+            raise
+        return None
 
 
 class DirectoryWatch(object):

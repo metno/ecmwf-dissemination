@@ -52,14 +52,15 @@ class Daemon(object):
         self.model_run_collection = modelstatus.ModelRunCollection(*args, **kwargs)
         self.data_collection = modelstatus.DataCollection(*args, **kwargs)
 
-    def get_or_post_model_run_resource(self, dataset):
+    def get_or_post_model_run_resource(self, data_provider, reference_time):
         """
-        Return a model_run resource at the Modelstatus server, matching the
-        provided data set. If none is found, it is created.
+        Search for a model_run resource at the Modelstatus server, matching the
+        given data provider and reference time. If no records are found, one is
+        created using a POST request.
         """
         parameters = {
-            'reference_time': dataset.reference_time().isoformat(),
-            'data_provider': dataset.data_provider(),
+            'data_provider': data_provider,
+            'reference_time': reference_time.strftime('%Y-%m-%dT%H:%M:%S%Z'),
         }
 
         # Execute a remote search for a model run
@@ -72,6 +73,18 @@ class Daemon(object):
             resource = resources[0]
 
         return resource
+
+    def get_or_post_model_run_resources(self, dataset):
+        """
+        Return a list of model run resources at the Modelstatus server,
+        matching the provided data set. If any model run resource does not
+        exist, it is created.
+        """
+        resources = []
+        for data_provider in dataset.data_providers():
+            for reference_time in dataset.reference_times():
+                resources += [self.get_or_post_model_run_resource(data_provider, reference_time)]
+        return resources
 
     def post_data_resource(self, dataset, model_run_resource):
         """
@@ -116,13 +129,12 @@ class Daemon(object):
 
         logging.info('%s: dataset moved' % dataset)
 
-        # Obtain a Modelstatus ID for this model run
-        model_run_resource = self.get_or_post_model_run_resource(dataset)
-        logging.info('%s: resource created' % model_run_resource)
-
-        # Submit data file
-        data_resource = self.post_data_resource(dataset, model_run_resource)
-        logging.info('%s: resource created' % data_resource)
+        # Obtain Modelstatus IDs for this model run, and submit data files
+        model_run_resources = self.get_or_post_model_run_resources(dataset)
+        for model_run_resource in model_run_resources:
+            data_resource = self.post_data_resource(dataset, model_run_resource)
+            logging.info('%s: resource created' % model_run_resource)
+            logging.info('%s: resource created' % data_resource)
 
         # All done
         logging.info('%s: all done; processed successfully' % dataset)
