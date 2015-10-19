@@ -1,9 +1,12 @@
 import ecdiss.recvd
 import tempfile
+import datetime
+import dateutil.tz
+import pygrib
 import os
 
 from nose.tools import with_setup, raises
-from unittest.case import SkipTest
+# from unittest.case import SkipTest
 
 dataset = None
 
@@ -279,81 +282,111 @@ def test_move_incomplete_dataset():
     dataset.move('/tmp')
 
 
+@with_setup(setup_bogus)
 def test_force_utc():
     """
     Test that a naive timestamp is successfully converted into UTC.
     """
-    raise SkipTest()
+    naive_timestamp = datetime.datetime(2000, 1, 1, 12, 0, 0)
+    utc_timestamp = dataset.force_utc(naive_timestamp)
+    assert isinstance(utc_timestamp.tzinfo, dateutil.tz.tzutc)
 
 
+@with_setup(setup_bogus)
 def test_force_utc_with_timezone():
     """
     Test that a timestamp with timezone is untouched by UTC conversion.
     """
-    raise SkipTest()
+    timezone = dateutil.tz.gettz('GMT+08:00')
+    timestamp_source = datetime.datetime(2000, 1, 1, 12, 0, 0, tzinfo=timezone)
+    timestamp_dest = dataset.force_utc(timestamp_source)
+    delta = timestamp_source - timestamp_dest
+    assert delta.total_seconds() == 0
 
 
+@with_setup(setup_real_files)
 def test_open_grib():
     """
     Test that a GRIB file can be successfully opened and parsed.
     """
-    raise SkipTest()
+    dataset.open_grib()
+    assert isinstance(dataset.grib_reader, pygrib.open)
+    assert len(dataset.grib_data) == 1
 
 
+@with_setup(setup_bogus)
+@raises(ecdiss.recvd.EcdissException)
 def test_open_grib_no_data_file():
     """
     Test that a opening a GRIB file throws an exception when the data set is missing.
     """
-    raise SkipTest()
+    dataset.open_grib()
 
 
+@with_setup(setup_temporary_files)
+@raises(ecdiss.recvd.EcdissException)
 def test_open_grib_empty():
     """
     Test that a opening an empty GRIB file throws an exception.
     """
-    raise SkipTest()
+    dataset.open_grib()
 
 
+@with_setup(setup_real_files)
 def test_reference_times():
     """
     Test that the correct dataset reference time is returned.
     """
-    raise SkipTest()
+    comparison_timestamp = datetime.datetime(2015, 10, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    reference_times = dataset.reference_times()
+    assert len(reference_times) == 1
+    assert reference_times[0] == comparison_timestamp
 
 
+@with_setup(setup_bogus)
+@raises(ecdiss.recvd.EcdissException)
 def test_reference_times_missing_dataset():
     """
     Test that an exception is thrown when trying to read reference times from a
     non-existant data set.
     """
-    raise SkipTest()
+    dataset.reference_times()
 
 
+@with_setup(setup_real_files)
 def test_data_providers():
     """
     Test that the correct dataset data provider is returned.
     """
-    raise SkipTest()
+    data_providers = dataset.data_providers()
+    assert len(data_providers) == 1
+    assert data_providers[0] == 'ecmf.145'
 
 
+@with_setup(setup_bogus)
+@raises(ecdiss.recvd.EcdissException)
 def test_data_providers_missing_dataset():
     """
     Test that an exception is thrown when trying to read data providers from a
     non-existant data set.
     """
-    raise SkipTest()
+    dataset.data_providers()
 
 
+@with_setup(setup_real_files)
 def test_file_type():
     """
     Test that the correct dataset file type is returned.
     """
-    raise SkipTest()
+    file_type = dataset.file_type()
+    assert file_type == 'grib'
 
 
+@with_setup(setup_bogus)
+@raises(ecdiss.recvd.EcdissException)
 def test_file_type_missing_dataset():
     """
     Test that an exception is thrown when trying to read the file type from a
     non-existant data set.
     """
-    raise SkipTest()
+    dataset.file_type()
