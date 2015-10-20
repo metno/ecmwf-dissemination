@@ -1,48 +1,37 @@
 import logging
+import logging.config
 import argparse
+import ConfigParser
 
 import ecdiss.recvd
 import ecdiss.recvd.daemon
 
 
-def setup_logging():
-    logging.basicConfig(format='%(asctime)s (%(levelname)s) %(message)s', level=logging.DEBUG)
-
-
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--input', action='store', required=True,
-                        help='Directory to watch for input files')
-    parser.add_argument('--output', action='store', required=True,
-                        help='Move valid input file to this directory')
-    parser.add_argument('--modelstatus', action='store', required=True,
-                        help='URL to Modelstatus service')
-    parser.add_argument('--user', action='store', required=True,
-                        help='Modelstatus user name')
-    parser.add_argument('--password', action='store', required=True,
-                        help='Modelstatus password')
-    parser.add_argument('--verify-ssl', dest='verify_ssl', action='store_true', default=True,
-                        help='Verify Modelstatus SSL certificate')
-    parser.add_argument('--no-verify-ssl', dest='verify_ssl', action='store_false')
-    parser.add_argument('--url', action='store', required=True,
-                        help='Base URL where local data sets are served')
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument('--config', action='store', required=True,
+                                 help='Path to configuration file')
 
-    args = parser.parse_args()
+    args = argument_parser.parse_args()
 
-    setup_logging()
+    logging.config.fileConfig(args.config)
 
-    watcher = ecdiss.recvd.DirectoryWatch(args.input)
+    config_parser = ConfigParser.SafeConfigParser()
+    config_parser.read(args.config)
+
+    spool_directory = config_parser.get('ecmwf', 'spool_directory')
+    watcher = ecdiss.recvd.DirectoryWatch(spool_directory)
     daemon = ecdiss.recvd.daemon.Daemon(
         watcher,
-        args.url,
-        args.output,
-        args.modelstatus,
-        args.user,
-        args.password,
-        args.verify_ssl,
+        config_parser.get('hosting', 'base_url'),
+        config_parser.get('ecmwf', 'destination_directory'),
+        config_parser.get('modelstatus', 'url'),
+        config_parser.get('modelstatus', 'username'),
+        config_parser.get('modelstatus', 'password'),
+        config_parser.get('modelstatus', 'verify_ssl'),
     )
 
-    daemon.process_directory(args.input)
+    daemon.process_directory(spool_directory)
     daemon.main()
 
 
