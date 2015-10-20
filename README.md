@@ -5,7 +5,7 @@
 First, you'll need some dependencies to build the pygrib library:
 
 ```
-sudo apt-get install libjasper-dev libopenjpeg-dev build-essential
+sudo apt-get install build-essential libjasper-dev libopenjpeg-dev python-dev libxml2-dev libxslt-dev libgrib-api-dev zlib1g-dev libpng12-dev
 ```
 
 Change to the repository you just checked out.
@@ -20,7 +20,8 @@ source deps/bin/activate
 Next, install the ECMWF daemons and their dependencies in the virtual environment:
 
 ```
-python setup.py develop
+pip install numpy
+pip install -e .
 ```
 
 Check that the tests pass, then you're done.
