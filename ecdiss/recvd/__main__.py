@@ -1,13 +1,15 @@
+import sys
 import logging
 import logging.config
 import argparse
+import traceback
 import ConfigParser
 
 import ecdiss.recvd
 import ecdiss.recvd.daemon
 
 
-def main():
+def run():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('--config', action='store', required=True,
                                  help='Path to configuration file')
@@ -33,6 +35,24 @@ def main():
 
     daemon.process_directory(spool_directory)
     daemon.main()
+
+    return 0
+
+
+def main():
+    try:
+        exit_code = run()
+    except Exception, e:
+        logging.critical("Fatal error: %s" % e)
+        exception = traceback.format_exc().split("\n")
+        logging.debug("***********************************************************")
+        logging.debug("Uncaught exception during program execution. THIS IS A BUG!")
+        logging.debug("***********************************************************")
+        for line in exception:
+            logging.debug(line)
+        exit_code = 255
+
+    sys.exit(exit_code)
 
 
 if __name__ == '__main__':
