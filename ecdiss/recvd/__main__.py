@@ -26,10 +26,12 @@ def run():
     daemon = ecdiss.recvd.daemon.Daemon(
         watcher,
         config_parser.get('hosting', 'base_url'),
+        int(config_parser.get('hosting', 'file_lifetime')),
+        config_parser.get('hosting', 'service_backend'),
         config_parser.get('ecmwf', 'destination_directory'),
         config_parser.get('modelstatus', 'url'),
         config_parser.get('modelstatus', 'username'),
-        config_parser.get('modelstatus', 'password'),
+        config_parser.get('modelstatus', 'api_key'),
         config_parser.get('modelstatus', 'verify_ssl'),
     )
 

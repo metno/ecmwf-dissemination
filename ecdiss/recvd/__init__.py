@@ -182,13 +182,13 @@ class Dataset(object):
 
     def data_providers(self):
         """
-        Return the data provider name of this dataset.
-        Data provider names are not normalized, but consists of a combination
-        of generating center and generating process.
+        Return the data provider names of this dataset. Data provider names
+        consists of a combination of generating center and generating process
+        identifier.
         """
         self.open_grib()
-        providers = [[grib.centre, grib.generatingProcessIdentifier] for grib in self.grib_data]
-        return list(set(sorted(['%s.%s' % (x[0], x[1]) for x in providers])))
+        providers = [(grib.centre, grib.generatingProcessIdentifier) for grib in self.grib_data]
+        return list(set(sorted(providers)))
 
     def file_type(self):
         """

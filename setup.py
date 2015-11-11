@@ -14,7 +14,7 @@ config = {
         'nose==1.3.7',
         'inotify==0.2.4',
         'python-dateutil==2.4.2',
-        'modelstatus-client==1.1.0',
+        'modelstatus-client==2.0.0',
         'numpy==1.10.1',
         'pygrib==2.0.0',
         'pyproj==1.9.4',

@@ -360,7 +360,7 @@ def test_data_providers():
     """
     data_providers = dataset.data_providers()
     assert len(data_providers) == 1
-    assert data_providers[0] == 'ecmf.145'
+    assert data_providers[0] == ('ecmf', 145)
 
 
 @with_setup(setup_bogus)
