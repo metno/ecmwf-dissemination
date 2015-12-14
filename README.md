@@ -5,6 +5,7 @@
 First, you'll need some dependencies to build the pygrib library:
 
 ```
+sudo apt-get install python-virtualenv python-pip
 sudo apt-get install build-essential libjasper-dev libopenjpeg-dev python-dev libxml2-dev libxslt-dev libgrib-api-dev zlib1g-dev libpng12-dev
 ```
 
