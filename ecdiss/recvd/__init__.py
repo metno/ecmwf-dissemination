@@ -11,6 +11,13 @@ class EcdissException(Exception):
     pass
 
 
+class EcdissModelstatusException(EcdissException):
+    """
+    Thrown when there is insufficient data available at the Modelstatus server.
+    """
+    pass
+
+
 class InvalidDataException(EcdissException):
     pass
 
@@ -149,7 +156,7 @@ class Dataset(object):
         """
         Return a textual representation of this dataset.
         """
-        return 'Dataset at %s' % self.data_path
+        return '<Dataset at %s>' % self.data_path
 
     def state(self):
         """
