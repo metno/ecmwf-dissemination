@@ -1,8 +1,8 @@
 import os
 import hashlib
+import datetime
 import dateutil.tz
 import inotify.adapters
-import pygrib
 
 READ_BUFFER = 8192
 
@@ -11,14 +11,21 @@ class EcdissException(Exception):
     pass
 
 
-class EcdissModelstatusException(EcdissException):
+class EcdissProductstatusException(EcdissException):
     """
-    Thrown when there is insufficient data available at the Modelstatus server.
+    Thrown when there is insufficient data available at the Productstatus server.
     """
     pass
 
 
 class InvalidDataException(EcdissException):
+    pass
+
+
+class InvalidFilenameException(EcdissException):
+    """
+    Thrown when a filename does not fit into the expected format.
+    """
     pass
 
 
@@ -33,8 +40,7 @@ class Dataset(object):
         self.md5_path = paths['md5']
         self.md5_key = None
         self.md5_result = None
-        self.grib_reader = None
-        self.grib_data = None
+        self.filename_components = {}
 
     def _derive_paths(self, path):
         """
@@ -121,19 +127,6 @@ class Dataset(object):
             self.calculate_md5sum()
         return self.md5_key == self.md5_result
 
-    def open_grib(self):
-        """
-        Open the data file as a GRIB object.
-        """
-        if self.grib_reader:
-            return
-        if not self.has_data_file():
-            raise EcdissException('Cannot get GRIB file handle: missing data file at %s' % self.data_path)
-        self.grib_reader = pygrib.open(self.data_path)
-        self.grib_data = self.grib_reader.read()
-        if len(self.grib_data) == 0:
-            raise EcdissException('GRIB data set is empty')
-
     def data_filename(self):
         """
         Return the filename part of the data file path.
@@ -180,33 +173,88 @@ class Dataset(object):
             return timestamp.replace(tzinfo=dateutil.tz.tzutc())
         return timestamp
 
-    def reference_times(self):
+    def parse_filename_timestamp(self, stamp, now):
         """
-        Return a list of model reference timestamps for this dataset.
+        Parse a timestamp from a ECMWF dataset filename.
+        The year is not part of the filename, and must be guessed.
+        Returns a datetime object, or None if only underscores are given.
         """
-        self.open_grib()
-        return list(set(sorted([self.force_utc(grib.analDate) for grib in self.grib_data])))
+        try:
+            ts = datetime.datetime.strptime(stamp, '%m%d%H%M')
+        except ValueError:
+            try:
+                ts = datetime.datetime.strptime(stamp, '%m%d____')
+            except ValueError:
+                if stamp == '________':
+                    return None
+                raise
+        ts = self.force_utc(ts)
+        year = now.year
+        if now.month < ts.month:
+            # assume that if current timestamp's month is lower than dataset
+            # filename's month, a year change has taken place, and we are
+            # processing last year's dataset.
+            year -= 1
+        return ts.replace(year=year)
 
-    def data_providers(self):
+    def parse_filename(self, now):
         """
-        Return the data provider names of this dataset. Data provider names
-        consists of a combination of generating center and generating process
-        identifier.
+        Return the parsed components of the dataset filename.
+        Note that HHMM might be ____.
+
+        A filename looks like this:
+        BFS11120600111511001
+        ^^^                     The stream definition name
+           ^^^^^^^^             Analysis start time, MMDDHHMM
+                   ^^^^^^^^     Analysis end time, MMDDHHMM
+                           ^    Dataset version
         """
-        self.open_grib()
-        providers = [(grib.centre, grib.generatingProcessIdentifier) for grib in self.grib_data]
-        return list(set(sorted(providers)))
+        if self.filename_components:
+            return
+        filename = self.data_filename()
+        start = filename[3:11]
+        end = filename[11:19]
+        try:
+            self.filename_components['analysis_start_time'] = self.parse_filename_timestamp(start, now)
+            self.filename_components['analysis_end_time'] = self.parse_filename_timestamp(end, now)
+            self.filename_components['name'] = filename[0:3]
+            self.filename_components['version'] = int(filename[19:])
+        except ValueError:
+            raise InvalidFilenameException('Filename %s does not match expected format' % self.data_filename())
+
+    def analysis_start_time(self):
+        """
+        Return the analysis start time of this dataset, according to the filename.
+        """
+        self.parse_filename(datetime.datetime.now())
+        return self.filename_components['analysis_start_time']
+
+    def analysis_end_time(self):
+        """
+        Return the analysis end time of this dataset, according to the filename.
+        """
+        self.parse_filename(datetime.datetime.now())
+        return self.filename_components['analysis_end_time']
+
+    def name(self):
+        """
+        Return the dataset name, according to the filename.
+        """
+        self.parse_filename(datetime.datetime.now())
+        return self.filename_components['name']
+
+    def version(self):
+        """
+        Return the dataset version, according to the filename.
+        """
+        self.parse_filename(datetime.datetime.now())
+        return self.filename_components['version']
 
     def file_type(self):
         """
         Return the file type of this dataset.
         """
-        try:
-            self.open_grib()
-            return 'grib'
-        except EcdissException:
-            raise
-        return None
+        return 'GRIB'
 
 
 class DirectoryWatch(object):

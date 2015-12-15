@@ -5,8 +5,8 @@ import json
 import time
 import datetime
 
-import modelstatus.api
-import modelstatus.exceptions
+import productstatus.api
+import productstatus.exceptions
 
 import ecdiss.recvd
 import ecdiss.recvd.daemon
@@ -93,14 +93,14 @@ class Daemon(object):
     ECMWF dissemination daemon
 
     This class monitors a directory for written files. Once a file has been
-    written, the daemon checks whether the file is weather model data or its
-    corresponding md5sum file. If both files exists, the pair is submitted for
+    written, the daemon checks whether the file is a) weather model data or b)
+    its corresponding md5sum file. If both files exists, the pair is submitted for
     the following processing:
 
         1. Validate the data file against the md5sum file
         2. Move the file to its appointed location
         3. Extract file information
-        4. Post dataset to the Modelstatus service
+        4. Post dataset to the Productstatus service
 
     After processing is complete, the daemon forgets about the data set.
     """
@@ -110,12 +110,12 @@ class Daemon(object):
                  checkpoint,
                  ecdiss_base_url,
                  dataset_lifetime,
-                 modelstatus_service_backend_uuid,
+                 productstatus_service_backend_uuid,
                  output_path,
-                 modelstatus_url,
-                 modelstatus_username,
-                 modelstatus_api_key,
-                 modelstatus_verify_ssl,
+                 productstatus_url,
+                 productstatus_username,
+                 productstatus_api_key,
+                 productstatus_verify_ssl,
                  ):
 
         self.directory_watch = directory_watch
@@ -123,17 +123,17 @@ class Daemon(object):
         self.dataset_lifetime = datetime.timedelta(minutes=dataset_lifetime)
         self.output_path = output_path
         self.checkpoint = checkpoint
-        self.modelstatus = modelstatus.api.Api(modelstatus_url,
-                                               verify_ssl=bool(modelstatus_verify_ssl),
-                                               username=modelstatus_username,
-                                               api_key=modelstatus_api_key)
-        self.modelstatus_service_backend = self.modelstatus.service_backend[modelstatus_service_backend_uuid]
-        self.modelstatus_data_formats = {}
-        self.modelstatus_models = {}
+        self.productstatus = productstatus.api.Api(productstatus_url,
+                                                   verify_ssl=productstatus_verify_ssl,
+                                                   username=productstatus_username,
+                                                   api_key=productstatus_api_key)
+        self.productstatus_service_backend = self.productstatus.servicebackend[productstatus_service_backend_uuid]
+        self.productstatus_dataformats = {}
+        self.productstatus_products = {}
 
-    def modelstatus_get_or_post(self, collection, data, order_by=None):
+    def productstatus_get_or_post(self, collection, data, order_by=None):
         """
-        Search for a certain resource type at the Modelstatus server, matching
+        Search for a certain resource type at the Productstatus server, matching
         the given parameters in the `data` variable. If no records are found,
         one is created using a POST request. Returns a single Resource object.
         """
@@ -156,89 +156,76 @@ class Daemon(object):
 
         return resource
 
-    def get_modelstatus_data_format(self, file_type):
+    def get_productstatus_dataformat(self, dataset):
         """
-        Given a file format string, return a DataFormat object pointing to the
+        Given a Dataset object, return a DataFormat object pointing to the
         correct data format.
         """
-        if file_type not in self.modelstatus_data_formats:
-            qs = self.modelstatus.data_format.objects.filter(name=file_type)
+        file_type = dataset.file_type()
+        if file_type not in self.productstatus_dataformats:
+            qs = self.productstatus.dataformat.objects.filter(name=file_type)
             if qs.count() == 0:
-                raise ecdiss.recvd.EcdissModelstatusException(
-                    "Data format '%s' was not found on the Modelstatus server" % file_type
+                raise ecdiss.recvd.EcdissProductstatusException(
+                    "Data format '%s' was not found on the Productstatus server" % file_type
                 )
             resource = qs[0]
-            self.modelstatus_data_formats[file_type] = resource
-            logging.info('%s: Modelstatus data_format for %s' % (resource, file_type))
-        return self.modelstatus_data_formats[file_type]
+            self.productstatus_dataformats[file_type] = resource
+            logging.info('%s: Productstatus dataformat for %s' % (resource, file_type))
+        return self.productstatus_dataformats[file_type]
 
-    def get_model_by_grib_metadata(self, data_provider):
+    def get_productstatus_product(self, dataset):
         """
-        Given a Dataset object, return a matching Model resource at the
-        Modelstatus server, or None if no matching model is found.
+        Given a Dataset object, return a matching Product resource at the
+        Productstatus server, or None if no matching product is found.
         """
-        if data_provider not in self.modelstatus_models:
-            qs = self.modelstatus.model.objects.filter(
-                grib_center=data_provider[0],
-                grib_generating_process_id=unicode(data_provider[1]),
-                )
-            name_id = "GRIB center '%s' and generating process id '%d'" % data_provider
+        name = dataset.name()
+        if name not in self.productstatus_products:
+            qs = self.productstatus.product.objects.filter(foreign_id=name, foreign_id_type='ecmwf')
+            name_desc = "ECMWF stream name '%s'" % name
             if qs.count() == 0:
-                raise ecdiss.recvd.EcdissModelstatusException(
-                    "Model defined from %s was not found on the Modelstatus server" % name_id
+                raise ecdiss.recvd.EcdissProductstatusException(
+                    "Product defined from %s was not found on the Productstatus server" % name_desc
                 )
             resource = qs[0]
-            self.modelstatus_models[data_provider] = resource
-            logging.info("%s: Modelstatus data_provider for %s" % (resource, name_id))
-        return self.modelstatus_models[data_provider]
+            self.productstatus_products[name] = resource
+            logging.info("%s: Productstatus Product for %s" % (resource, name_desc))
+        return self.productstatus_products[name]
 
-    def get_or_post_model_run_resource(self, model, reference_time):
+    def get_or_post_productinstance_resource(self, dataset):
         """
-        Return a matching ModelRun resource according to Model and reference time.
+        Return a matching ProductRun resource according to Product and reference time.
         """
+        product = self.get_productstatus_product(dataset)
         parameters = {
-            'model': model,
-            'reference_time': reference_time,
+            'product': product,
+            'reference_time': dataset.analysis_start_time(),
+            # FIXME: add version to POST, see T2084
         }
         order_by = '-version'
-        return self.modelstatus_get_or_post(self.modelstatus.model_run, parameters, order_by)
+        return self.productstatus_get_or_post(self.productstatus.productinstance, parameters, order_by)
 
-    def get_or_post_model_run_resources(self, dataset):
+    def get_or_post_data_resource(self, productinstance, dataset):
         """
-        Return a list of model run resources at the Modelstatus server,
-        matching the provided data set. If any model run resource does not
-        exist, it is created.
-        """
-        resources = []
-        for data_provider in dataset.data_providers():
-            model = self.get_model_by_grib_metadata(data_provider)
-            for reference_time in dataset.reference_times():
-                resources += [self.get_or_post_model_run_resource(model, reference_time)]
-        return resources
-
-    def get_or_post_data_resource(self, model_run, reference_time):
-        """
-        Return a matching Data resource according to ModelRun and data file
+        Return a matching Data resource according to ProductRun and data file
         begin/end times.
         """
         parameters = {
-            'model_run': model_run,
-            # FIXME: we should supply time periods
-            'time_period_begin': None,
-            'time_period_end': None,
+            'productinstance': productinstance,
+            'time_period_begin': dataset.analysis_start_time(),
+            'time_period_end': dataset.analysis_end_time(),
         }
-        return self.modelstatus_get_or_post(self.modelstatus.data, parameters)
+        return self.productstatus_get_or_post(self.productstatus.data, parameters)
 
-    def post_data_file_resource(self, data, dataset):
+    def post_datainstance_resource(self, data, dataset):
         """
-        Create a DataFile resource at the Modelstatus server, referring to the
+        Create a DataInstance resource at the Productstatus server, referring to the
         given data set.
         """
-        resource = self.modelstatus.data_file.create()
+        resource = self.productstatus.datainstance.create()
         resource.data = data
         resource.expires = datetime.datetime.now() + self.dataset_lifetime
-        resource.format = self.get_modelstatus_data_format(dataset.file_type())
-        resource.service_backend = self.modelstatus_service_backend
+        resource.format = self.get_productstatus_dataformat(dataset)
+        resource.servicebackend = self.productstatus_service_backend
         resource.url = self.ecdiss_base_url + dataset.data_filename()
         resource.save()
         return resource
@@ -285,31 +272,35 @@ class Daemon(object):
         # Record the move in the checkpoint
         self.checkpoint.add(dataset, CHECKPOINT_DATASET_MOVED)
 
-        # Obtain Modelstatus IDs for this model run, and submit data files
-        def modelstatus_submit():
-            logging.info('Determining which model run(s) to post to...')
-            model_run_resources = self.get_or_post_model_run_resources(dataset)
-            for model_run_resource in model_run_resources:
-                logging.info('Now posting to model run: %s.' % model_run_resource)
-                logging.info('Determining which data resource to post to...')
-                data_resource = self.get_or_post_data_resource(
-                    model_run_resource,
-                    model_run_resource.reference_time
-                )
-                logging.info('Creating a data file resource...')
-                data_file_resource = self.post_data_file_resource(data_resource, dataset)
-                logging.info("%s: data file resource created." % data_file_resource)
-                logging.info("Now publicly available at %s until %s." % (
-                    data_file_resource.url,
-                    data_file_resource.expires.strftime('%Y-%m-%dT%H:%M:%S%z'),
-                ))
+        # Obtain Productstatus IDs for this product instance, and submit data files
+        def productstatus_submit():
+
+            # Get or create a ProductInstance remote resource
+            logging.info('Determining which ProductInstance to post to...')
+            productinstance_resource = self.get_or_post_productinstance_resource(dataset)
+            logging.info('Now posting to ProductInstance: %s.' % productinstance_resource)
+
+            # Get or create a Data remote resource
+            logging.info('Determining which Data resource to post to...')
+            data_resource = self.get_or_post_data_resource(productinstance_resource, dataset)
+
+            # Create a DataInstance remote resource
+            logging.info('Creating a DataInstance resource...')
+            datainstance_resource = self.post_datainstance_resource(data_resource, dataset)
+            logging.info("%s: DataInstance resource created." % datainstance_resource)
+
+            # Everything has been saved at the remote server
+            logging.info("Now publicly available at %s until %s." % (
+                datainstance_resource.url,
+                datainstance_resource.expires.strftime('%Y-%m-%dT%H:%M:%S%z'),
+            ))
 
         # Run the above function indefinitely
         retry_indefinitely(
-            modelstatus_submit,
+            productstatus_submit,
             exceptions=(
-                modelstatus.exceptions.ServiceUnavailableException,
-                ecdiss.recvd.EcdissModelstatusException
+                productstatus.exceptions.ServiceUnavailableException,
+                ecdiss.recvd.EcdissProductstatusException
             )
         )
 

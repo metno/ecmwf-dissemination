@@ -36,10 +36,10 @@ def run():
         int(config_parser.get('hosting', 'file_lifetime')),
         config_parser.get('hosting', 'service_backend'),
         destination_directory,
-        config_parser.get('modelstatus', 'url'),
-        config_parser.get('modelstatus', 'username'),
-        config_parser.get('modelstatus', 'api_key'),
-        config_parser.get('modelstatus', 'verify_ssl'),
+        config_parser.get('productstatus', 'url'),
+        config_parser.get('productstatus', 'username'),
+        config_parser.get('productstatus', 'api_key'),
+        config_parser.getboolean('productstatus', 'verify_ssl'),
     )
 
     daemon.process_incomplete_checkpoints([destination_directory, spool_directory])

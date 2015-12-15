@@ -2,7 +2,6 @@ import ecdiss.recvd
 import tempfile
 import datetime
 import dateutil.tz
-import pygrib
 import os
 
 from nose.tools import with_setup, raises
@@ -24,7 +23,7 @@ def setup_real_files():
     Setup function: set up a valid dataset with real files.
     """
     global dataset
-    path = os.path.join(os.path.dirname(__file__), 'fixtures', 'test.grb')
+    path = os.path.join(os.path.dirname(__file__), 'fixtures', 'BFS11120600111511001')
     dataset = ecdiss.recvd.Dataset(path)
 
 
@@ -305,42 +304,87 @@ def test_force_utc_with_timezone():
 
 
 @with_setup(setup_real_files)
-def test_open_grib():
+def test_dataset_name():
     """
-    Test that a GRIB file can be successfully opened and parsed.
+    Test that the correct dataset name is returned.
     """
-    dataset.open_grib()
-    assert isinstance(dataset.grib_reader, pygrib.open)
-    assert len(dataset.grib_data) == 1
-
-
-@with_setup(setup_bogus)
-@raises(ecdiss.recvd.EcdissException)
-def test_open_grib_no_data_file():
-    """
-    Test that a opening a GRIB file throws an exception when the data set is missing.
-    """
-    dataset.open_grib()
-
-
-@with_setup(setup_temporary_files)
-@raises(ecdiss.recvd.EcdissException)
-def test_open_grib_empty():
-    """
-    Test that a opening an empty GRIB file throws an exception.
-    """
-    dataset.open_grib()
+    assert dataset.name() == 'BFS'
 
 
 @with_setup(setup_real_files)
-def test_reference_times():
+def test_dataset_version():
     """
-    Test that the correct dataset reference time is returned.
+    Test that the correct dataset version is returned.
     """
-    comparison_timestamp = datetime.datetime(2015, 10, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
-    reference_times = dataset.reference_times()
-    assert len(reference_times) == 1
-    assert reference_times[0] == comparison_timestamp
+    assert dataset.version() == 1
+
+
+@with_setup(setup_real_files)
+def test_analysis_start_time():
+    """
+    Test that the correct dataset analysis time is returned.
+    """
+    comparison_timestamp = datetime.datetime(2015, 11, 12, 6, 0, 0, tzinfo=dateutil.tz.tzutc())
+    # replacing year with 2015 since filenames do not contain the year, and the
+    # current year will be used instead.
+    analysis_start_time = dataset.analysis_start_time().replace(year=2015)
+    assert analysis_start_time == comparison_timestamp
+
+
+@with_setup(setup_real_files)
+def test_analysis_end_time():
+    """
+    Test that the correct dataset end time is returned.
+    """
+    comparison_timestamp = datetime.datetime(2015, 11, 15, 11, 0, 0, tzinfo=dateutil.tz.tzutc())
+    # replacing year with 2015, see above test.
+    analysis_end_time = dataset.analysis_end_time().replace(year=2015)
+    assert analysis_end_time == comparison_timestamp
+
+
+@with_setup(setup_real_files)
+def test_parse_filename_timestamp_current_year():
+    """
+    Test that the timestamp parser works correctly when parsing timestamps from
+    the current year.
+    """
+    now = datetime.datetime(2015, 12, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2015, 6, 1, 13, 25, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = dataset.parse_filename_timestamp('06011325', now)
+    assert timestamp == comparison_timestamp
+
+
+@with_setup(setup_real_files)
+def test_parse_filename_timestamp_previous_year():
+    """
+    Test that the timestamp parser works correctly when parsing timestamps from
+    the previous year.
+    """
+    now = datetime.datetime(2015, 3, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2014, 6, 1, 13, 25, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = dataset.parse_filename_timestamp('06011325', now)
+    assert timestamp == comparison_timestamp
+
+
+@with_setup(setup_real_files)
+def test_parse_filename_timestamp_missing_time():
+    """
+    Test that the timestamp parser works with timestamps that are missing hour
+    and minute.
+    """
+    now = datetime.datetime(2015, 12, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2015, 6, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = dataset.parse_filename_timestamp('0601____', now)
+    assert timestamp == comparison_timestamp
+
+
+@with_setup(setup_real_files)
+def test_parse_filename_timestamp_missing_everything():
+    """
+    Test that the timestamp parser works with only underscores.
+    """
+    timestamp = dataset.parse_filename_timestamp('________', datetime.datetime.now())
+    assert timestamp is None
 
 
 @with_setup(setup_bogus)
@@ -350,27 +394,7 @@ def test_reference_times_missing_dataset():
     Test that an exception is thrown when trying to read reference times from a
     non-existant data set.
     """
-    dataset.reference_times()
-
-
-@with_setup(setup_real_files)
-def test_data_providers():
-    """
-    Test that the correct dataset data provider is returned.
-    """
-    data_providers = dataset.data_providers()
-    assert len(data_providers) == 1
-    assert data_providers[0] == ('ecmf', 145)
-
-
-@with_setup(setup_bogus)
-@raises(ecdiss.recvd.EcdissException)
-def test_data_providers_missing_dataset():
-    """
-    Test that an exception is thrown when trying to read data providers from a
-    non-existant data set.
-    """
-    dataset.data_providers()
+    dataset.analysis_start_time()
 
 
 @with_setup(setup_real_files)
@@ -379,14 +403,4 @@ def test_file_type():
     Test that the correct dataset file type is returned.
     """
     file_type = dataset.file_type()
-    assert file_type == 'grib'
-
-
-@with_setup(setup_bogus)
-@raises(ecdiss.recvd.EcdissException)
-def test_file_type_missing_dataset():
-    """
-    Test that an exception is thrown when trying to read the file type from a
-    non-existant data set.
-    """
-    dataset.file_type()
+    assert file_type == 'GRIB'
