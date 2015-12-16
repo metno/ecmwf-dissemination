@@ -7,6 +7,38 @@ import inotify.adapters
 READ_BUFFER = 8192
 
 
+def force_utc(timestamp):
+    """
+    Force a "naive" timestamp into UTC, or return the original timestamp
+    for sane timestamps.
+    """
+    if not timestamp.tzinfo:
+        return timestamp.replace(tzinfo=dateutil.tz.tzutc())
+    return timestamp
+
+
+def parse_filename_timestamp(stamp, now):
+    """
+    Parse a timestamp from a ECMWF dataset filename.
+    The year is not part of the filename, and must be guessed.
+    Returns a datetime object, or None if only underscores are given.
+    """
+    if stamp == '________':
+        return None
+    try:
+        ts = datetime.datetime.strptime(stamp, '%m%d%H%M')
+    except ValueError:
+        ts = datetime.datetime.strptime(stamp, '%m%d____')
+    ts = force_utc(ts)
+    year = now.year
+    if now.month < ts.month:
+        # assume that if current timestamp's month is lower than dataset
+        # filename's month, a year change has taken place, and we are
+        # processing last year's dataset.
+        year -= 1
+    return ts.replace(year=year)
+
+
 class EcdissException(Exception):
     pass
 
@@ -164,39 +196,6 @@ class Dataset(object):
         else:
             return 'missing'
 
-    def force_utc(self, timestamp):
-        """
-        Force a "naive" timestamp into UTC, or return the original timestamp
-        for sane timestamps.
-        """
-        if not timestamp.tzinfo:
-            return timestamp.replace(tzinfo=dateutil.tz.tzutc())
-        return timestamp
-
-    def parse_filename_timestamp(self, stamp, now):
-        """
-        Parse a timestamp from a ECMWF dataset filename.
-        The year is not part of the filename, and must be guessed.
-        Returns a datetime object, or None if only underscores are given.
-        """
-        try:
-            ts = datetime.datetime.strptime(stamp, '%m%d%H%M')
-        except ValueError:
-            try:
-                ts = datetime.datetime.strptime(stamp, '%m%d____')
-            except ValueError:
-                if stamp == '________':
-                    return None
-                raise
-        ts = self.force_utc(ts)
-        year = now.year
-        if now.month < ts.month:
-            # assume that if current timestamp's month is lower than dataset
-            # filename's month, a year change has taken place, and we are
-            # processing last year's dataset.
-            year -= 1
-        return ts.replace(year=year)
-
     def parse_filename(self, now):
         """
         Return the parsed components of the dataset filename.
@@ -215,8 +214,8 @@ class Dataset(object):
         start = filename[3:11]
         end = filename[11:19]
         try:
-            self.filename_components['analysis_start_time'] = self.parse_filename_timestamp(start, now)
-            self.filename_components['analysis_end_time'] = self.parse_filename_timestamp(end, now)
+            self.filename_components['analysis_start_time'] = parse_filename_timestamp(start, now)
+            self.filename_components['analysis_end_time'] = parse_filename_timestamp(end, now)
             self.filename_components['name'] = filename[0:3]
             self.filename_components['version'] = int(filename[19:])
         except ValueError:
@@ -258,9 +257,9 @@ class Dataset(object):
 
 
 class DirectoryWatch(object):
-    def __init__(self, directory):
+    def __init__(self, directory, block_duration_s=1):
         try:
-            self._inotify = inotify.adapters.Inotify()
+            self._inotify = inotify.adapters.Inotify(block_duration_s=block_duration_s)
             self._inotify.add_watch(directory)
         except:
             raise EcdissException('Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % directory)

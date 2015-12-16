@@ -15,6 +15,8 @@ config = {
         'inotify==0.2.4',
         'python-dateutil==2.4.2',
         'productstatus-client==3.0.0',
+        'mock==1.3.0',
+        'funcsigs==0.4',
     ],
     'packages': [],
     'scripts': [],

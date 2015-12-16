@@ -5,7 +5,6 @@ import json
 import time
 import datetime
 
-import productstatus.api
 import productstatus.exceptions
 
 import ecdiss.recvd
@@ -50,50 +49,75 @@ class Checkpoint(object):
 
     def save(self):
         data = json.dumps(self._states, sort_keys=True, indent=4, separators=(',', ': '))
-        with open(self._path, 'w') as f:
-            f.write(data)
+        try:
+            with open(self._path, 'w') as f:
+                f.write(data)
+        except IOError:
+            logging.error('State file %s cannot be written' % self._path)
+            raise
 
     def load(self):
+        self._states = {}
         try:
             with open(self._path, 'r') as f:
                 data = f.read()
-            self._states = json.loads(data)
+            if data:
+                self._states = json.loads(data)
         except IOError:
             logging.info('State file %s does not exist, starting from scratch' % self._path)
-            self._states = {}
 
     def keys(self):
         return self._states.keys()
 
-    def get_dataset_key(self, dataset):
-        return dataset.data_filename()
-
-    def get(self, dataset):
-        key = self.get_dataset_key(dataset)
+    def get(self, key):
         if key not in self._states:
             return 0
         return self._states[key]
 
-    def add(self, dataset, state):
-        key = self.get_dataset_key(dataset)
+    def add(self, key, state):
         if key not in self._states:
             self._states[key] = CHECKPOINT_DATASET_NOFLAGS
         self._states[key] |= state
         self.save()
 
-    def delete(self, dataset):
-        key = self.get_dataset_key(dataset)
+    def delete(self, key):
         if key in self._states:
             del self._states[key]
             self.save()
 
 
-class Daemon(object):
+def productstatus_get_or_post(collection, data, order_by=None):
     """
-    ECMWF dissemination daemon
+    Search for a certain resource type at the Productstatus server, matching
+    the given parameters in the `data` variable. If no records are found,
+    one is created using a POST request. Returns a single Resource object.
+    """
+    # search for existing
+    qs = collection.objects
+    qs.filter(**data)
+    if order_by:
+        qs.order_by(order_by)
 
-    This class monitors a directory for written files. Once a file has been
-    written, the daemon checks whether the file is a) weather model data or b)
+    # create if not found
+    if qs.count() == 0:
+        logging.info('No matching %s resource found, creating...' % collection._resource_name)
+        resource = collection.create()
+        [setattr(resource, key, value) for key, value in data.iteritems()]
+        resource.save()
+        logging.info('%s: resource created' % resource)
+    else:
+        resource = qs[0]
+        logging.info('%s: using existing resource' % resource)
+
+    return resource
+
+
+class DatasetPublisher(object):
+    """
+    Publish datasets from an 'incoming' directory on a productstatus server.
+
+    Notification about files, either via 'process_file' or 'process_incomplete_checkpoints',
+    triggers a check whether the file is a) weather model data or b)
     its corresponding md5sum file. If both files exists, the pair is submitted for
     the following processing:
 
@@ -102,59 +126,38 @@ class Daemon(object):
         3. Extract file information
         4. Post dataset to the Productstatus service
 
-    After processing is complete, the daemon forgets about the data set.
+    After processing is complete, this objects forgets about the data set / file.
     """
 
     def __init__(self,
-                 directory_watch,
                  checkpoint,
                  ecdiss_base_url,
                  dataset_lifetime,
-                 productstatus_service_backend_uuid,
+                 productstatus_service_backend,
                  output_path,
-                 productstatus_url,
-                 productstatus_username,
-                 productstatus_api_key,
-                 productstatus_verify_ssl,
+                 productstatus_api,
                  ):
 
-        self.directory_watch = directory_watch
         self.ecdiss_base_url = ecdiss_base_url
         self.dataset_lifetime = datetime.timedelta(minutes=dataset_lifetime)
         self.output_path = output_path
         self.checkpoint = checkpoint
-        self.productstatus = productstatus.api.Api(productstatus_url,
-                                                   verify_ssl=productstatus_verify_ssl,
-                                                   username=productstatus_username,
-                                                   api_key=productstatus_api_key)
-        self.productstatus_service_backend = self.productstatus.servicebackend[productstatus_service_backend_uuid]
+        self.productstatus = productstatus_api
+        self.productstatus_service_backend = productstatus_service_backend
         self.productstatus_dataformats = {}
         self.productstatus_products = {}
 
-    def productstatus_get_or_post(self, collection, data, order_by=None):
-        """
-        Search for a certain resource type at the Productstatus server, matching
-        the given parameters in the `data` variable. If no records are found,
-        one is created using a POST request. Returns a single Resource object.
-        """
-        # search for existing
-        qs = collection.objects
-        qs.filter(**data)
-        if order_by:
-            qs.order_by(order_by)
+    def get_dataset_key(self, dataset):
+        return dataset.data_filename()
 
-        # create if not found
-        if qs.count() == 0:
-            logging.info('No matching %s resource found, creating...' % collection._resource_name)
-            resource = collection.create()
-            [setattr(resource, key, value) for key, value in data.iteritems()]
-            resource.save()
-            logging.info('%s: resource created' % resource)
-        else:
-            resource = qs[0]
-            logging.info('%s: using existing resource' % resource)
+    def checkpoint_add(self, dataset, flag):
+        self.checkpoint.add(self.get_dataset_key(dataset), flag)
 
-        return resource
+    def checkpoint_get(self, dataset):
+        return self.checkpoint.get(self.get_dataset_key(dataset))
+
+    def checkpoint_delete(self, dataset):
+        self.checkpoint.delete(self.get_dataset_key(dataset))
 
     def get_productstatus_dataformat(self, dataset):
         """
@@ -202,7 +205,7 @@ class Daemon(object):
             # FIXME: add version to POST, see T2084
         }
         order_by = '-version'
-        return self.productstatus_get_or_post(self.productstatus.productinstance, parameters, order_by)
+        return productstatus_get_or_post(self.productstatus.productinstance, parameters, order_by)
 
     def get_or_post_data_resource(self, productinstance, dataset):
         """
@@ -214,7 +217,7 @@ class Daemon(object):
             'time_period_begin': dataset.analysis_start_time(),
             'time_period_end': dataset.analysis_end_time(),
         }
-        return self.productstatus_get_or_post(self.productstatus.data, parameters)
+        return productstatus_get_or_post(self.productstatus.data, parameters)
 
     def post_datainstance_resource(self, data, dataset):
         """
@@ -245,7 +248,7 @@ class Daemon(object):
             return False
 
         # Register a checkpoint for this dataset to indicate that it exists
-        self.checkpoint.add(dataset, CHECKPOINT_DATASET_EXISTS)
+        self.checkpoint_add(dataset, CHECKPOINT_DATASET_EXISTS)
 
         # Check if contents matches md5sum
         try:
@@ -259,7 +262,7 @@ class Daemon(object):
             return False
 
         # Move the files to their proper location
-        if not self.checkpoint.get(dataset) & CHECKPOINT_DATASET_MOVED:
+        if not self.checkpoint_get(dataset) & CHECKPOINT_DATASET_MOVED:
             try:
                 dataset.move(self.output_path)
             except ecdiss.recvd.InvalidDataException, e:
@@ -270,7 +273,7 @@ class Daemon(object):
             logging.info('Skipping move; already moved according to checkpoint.')
 
         # Record the move in the checkpoint
-        self.checkpoint.add(dataset, CHECKPOINT_DATASET_MOVED)
+        self.checkpoint_add(dataset, CHECKPOINT_DATASET_MOVED)
 
         # Obtain Productstatus IDs for this product instance, and submit data files
         def productstatus_submit():
@@ -305,22 +308,10 @@ class Daemon(object):
         )
 
         # All done
-        self.checkpoint.delete(dataset)
+        self.checkpoint_delete(dataset)
         logging.info('===== %s: all done; processed successfully. =====' % dataset)
 
         return True
-
-    def process_inotify_event(self, event):
-        """
-        Perform an action when an inotify event is received.
-        """
-        if event is None:
-            return
-        header, attribs, path, filename = event
-        if 'IN_CLOSE_WRITE' not in attribs:
-            return
-        full_path = os.path.join(path, filename)
-        return self.process_file(full_path)
 
     def process_directory(self, directory):
         """
@@ -338,14 +329,41 @@ class Daemon(object):
         Iterates through files left unprocessed, and does away with them.
         """
         checkpointed_files = list(self.checkpoint.keys())
-        logging.info('Processing %d incomplete checkpoints.' % len(checkpointed_files))
+        n_checkpointed = len(checkpointed_files)
+        if n_checkpointed == 0:
+            return
+        logging.info('Processing %d incomplete checkpoints.' % n_checkpointed)
         for f in checkpointed_files:
             for d in directories:
                 path = os.path.join(d, f)
                 self.process_file(path)
         logging.info('Finished processing incomplete checkpoints.')
 
-    def main(self):
+
+class DirectoryDaemon(object):
+    """
+    Watch a directory for new files
+    """
+
+    def __init__(self, directory, callback_new_file=None, callback_timeout=None, timeout_s=1):
+        self.callback_new_file = callback_new_file
+        self.callback_timeout = callback_timeout
+        self.directory_watch = ecdiss.recvd.DirectoryWatch(directory, timeout_s)
+
+    def process_inotify_event(self, event):
+        """
+        Perform an action when an inotify event is received.
+        """
+        if (event is None) and self.callback_timeout:
+            self.callback_timeout()
+        elif self.callback_new_file:
+            header, attribs, path, filename = event
+            if 'IN_CLOSE_WRITE' not in attribs:
+                return
+            full_path = os.path.join(path, filename)
+            self.callback_new_file(full_path)
+
+    def run(self):
         """
         Main loop.
         Iterates over inotify file events from the kernel.
