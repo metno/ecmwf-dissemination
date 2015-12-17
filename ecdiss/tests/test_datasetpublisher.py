@@ -154,3 +154,9 @@ def test_retry_10():
 def test_retry_other():
     f = FailRepeatedly(10, NotMyProblem)
     retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=3)
+
+
+def test_retry_indefinitely():
+    f = FailRepeatedly(10)
+    retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=-1)
+    assert f.count == 11

@@ -11,7 +11,7 @@ import ecdiss.recvd.daemon
 import productstatus.api
 
 
-def run():
+def prepare():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('--config', action='store', required=True,
                                  help='Path to configuration file')
@@ -19,7 +19,7 @@ def run():
     args = argument_parser.parse_args()
 
     logging.config.fileConfig(args.config)
-    logging.info('ECMWF dissemination receiver daemon starting.')
+    logging.info('Starting up ECMWF dissemination receiver.')
 
     config_parser = ConfigParser.SafeConfigParser()
     config_parser.read(args.config)
@@ -63,7 +63,14 @@ def run():
         callback_timeout=process_incomplete_checkpoints,
     )
 
+    return watcher
+
+
+def run():
     try:
+        watcher = ecdiss.recvd.daemon.retry_n(prepare, give_up=-1)
+
+        logging.info('ECMWF dissemination receiver daemon waiting for events.')
         watcher.run()
     except KeyboardInterrupt:
         pass

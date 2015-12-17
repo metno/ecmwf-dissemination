@@ -19,16 +19,17 @@ CHECKPOINT_DATASET_MOVED = 2
 def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_up=5):
     """
     Call 'func' and, if it throws anything listed in 'exceptions', catch it and retry again
-    up to 'give_up' times.
-    Assumes that give_up > error > warning > 0.
+    up to 'give_up' times. If give_up is <= 0, retry indefinitely.
+    Checks that error > warning > 0, and give_up > error or give_up <= 0.
     """
+    assert (warning > 0) and (error > warning) and (give_up <= 0 or give_up > error)
     tries = 0
     while True:
         try:
             return func()
         except exceptions, e:
             tries += 1
-            if tries >= give_up:
+            if give_up > 0 and tries >= give_up:
                 logging.error('Action failed %d times, giving up: %s' % (give_up, e))
                 return
             if tries >= error:
