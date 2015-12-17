@@ -148,8 +148,6 @@ class DatasetPublisher(object):
         self.checkpoint = checkpoint
         self.productstatus = productstatus_api
         self.productstatus_service_backend = productstatus_service_backend
-        self.productstatus_dataformats = {}
-        self.productstatus_products = {}
 
     def get_dataset_key(self, dataset):
         return dataset.data_filename()
@@ -169,16 +167,14 @@ class DatasetPublisher(object):
         correct data format.
         """
         file_type = dataset.file_type()
-        if file_type not in self.productstatus_dataformats:
-            qs = self.productstatus.dataformat.objects.filter(name=file_type)
-            if qs.count() == 0:
-                raise ecdiss.recvd.EcdissProductstatusException(
-                    "Data format '%s' was not found on the Productstatus server" % file_type
-                )
-            resource = qs[0]
-            self.productstatus_dataformats[file_type] = resource
-            logging.info('%s: Productstatus dataformat for %s' % (resource, file_type))
-        return self.productstatus_dataformats[file_type]
+        qs = self.productstatus.dataformat.objects.filter(name=file_type)
+        if qs.count() == 0:
+            raise ecdiss.recvd.EcdissProductstatusException(
+                "Data format '%s' was not found on the Productstatus server" % file_type
+            )
+        resource = qs[0]
+        logging.info('%s: Productstatus dataformat for %s' % (resource, file_type))
+        return resource
 
     def get_productstatus_product(self, dataset):
         """
@@ -186,17 +182,15 @@ class DatasetPublisher(object):
         Productstatus server, or None if no matching product is found.
         """
         name = dataset.name()
-        if name not in self.productstatus_products:
-            qs = self.productstatus.product.objects.filter(foreign_id=name, foreign_id_type='ecmwf')
-            name_desc = "ECMWF stream name '%s'" % name
-            if qs.count() == 0:
-                raise ecdiss.recvd.EcdissProductstatusException(
-                    "Product defined from %s was not found on the Productstatus server" % name_desc
-                )
-            resource = qs[0]
-            self.productstatus_products[name] = resource
-            logging.info("%s: Productstatus Product for %s" % (resource, name_desc))
-        return self.productstatus_products[name]
+        qs = self.productstatus.product.objects.filter(foreign_id=name, foreign_id_type='ecmwf')
+        name_desc = "ECMWF stream name '%s'" % name
+        if qs.count() == 0:
+            raise ecdiss.recvd.EcdissProductstatusException(
+                "Product defined from %s was not found on the Productstatus server" % name_desc
+            )
+        resource = qs[0]
+        logging.info("%s: Productstatus Product for %s" % (resource, name_desc))
+        return resource
 
     def get_or_post_productinstance_resource(self, dataset):
         """
