@@ -1,5 +1,5 @@
 import ecdiss.recvd
-from ecdiss.recvd.daemon import Checkpoint, DatasetPublisher
+from ecdiss.recvd.daemon import Checkpoint, DatasetPublisher, retry_n
 
 import tempfile
 import os
@@ -99,3 +99,47 @@ def test_process_data():
     assert mock_datainstance.servicebackend == productstatus_service_backend
     assert mock_datainstance.url == base_url + data_filename
     assert mock_datainstance.save.called
+
+
+class MyProblem(Exception):
+    pass
+
+
+class NotMyProblem(Exception):
+    pass
+
+
+class FailRepeatedly(object):
+    def __init__(self, n_fail, exception=MyProblem):
+        self.n_fail = n_fail
+        self.count = 0
+        self.exception = exception
+
+    def __call__(self):
+        self.count += 1
+        if self.count <= self.n_fail:
+            raise self.exception()
+
+
+def test_retry_0():
+    f = FailRepeatedly(0)
+    retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=3)
+    assert f.count == 1
+
+
+def test_retry_1():
+    f = FailRepeatedly(1)
+    retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=3)
+    assert f.count == 2
+
+
+def test_retry_10():
+    f = FailRepeatedly(10)
+    retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=3)
+    assert f.count == 3
+
+
+@raises(NotMyProblem)
+def test_retry_other():
+    f = FailRepeatedly(10, NotMyProblem)
+    retry_n(f, interval=0.01, exceptions=(MyProblem,), warning=1, error=2, give_up=3)

@@ -16,10 +16,11 @@ CHECKPOINT_DATASET_EXISTS = 1
 CHECKPOINT_DATASET_MOVED = 2
 
 
-def retry_indefinitely(func, interval=5, exceptions=(Exception,), warning=1, error=3):
+def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_up=5):
     """
-    Retry a command indefinitely until it succeeds, catching all exceptions
-    specified in the function parameter.
+    Call 'func' and, if it throws anything listed in 'exceptions', catch it and retry again
+    up to 'give_up' times.
+    Assumes that give_up > error > warning > 0.
     """
     tries = 0
     while True:
@@ -27,6 +28,9 @@ def retry_indefinitely(func, interval=5, exceptions=(Exception,), warning=1, err
             return func()
         except exceptions, e:
             tries += 1
+            if tries >= give_up:
+                logging.error('Action failed %d times, giving up: %s' % (give_up, e))
+                return
             if tries >= error:
                 logfunc = logging.error
             elif tries >= warning:
@@ -298,8 +302,14 @@ class DatasetPublisher(object):
                 datainstance_resource.expires.strftime('%Y-%m-%dT%H:%M:%S%z'),
             ))
 
+            # All done
+            self.checkpoint_delete(dataset)
+            logging.info('===== %s: all done; processed successfully. =====' % dataset)
+
+            return True
+
         # Run the above function indefinitely
-        retry_indefinitely(
+        retry_n(
             productstatus_submit,
             exceptions=(
                 productstatus.exceptions.ServiceUnavailableException,
@@ -307,11 +317,7 @@ class DatasetPublisher(object):
             )
         )
 
-        # All done
-        self.checkpoint_delete(dataset)
-        logging.info('===== %s: all done; processed successfully. =====' % dataset)
-
-        return True
+        return False
 
     def process_directory(self, directory):
         """
