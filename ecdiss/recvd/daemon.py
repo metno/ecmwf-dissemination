@@ -260,18 +260,18 @@ class DatasetPublisher(object):
             return False
 
         # Move the files to their proper location
-        if not self.checkpoint_get(dataset) & CHECKPOINT_DATASET_MOVED:
+        if not (self.checkpoint_get(dataset) & CHECKPOINT_DATASET_MOVED):
             try:
                 dataset.move(self.output_path)
             except ecdiss.recvd.InvalidDataException, e:
                 logging.error('Error when moving: %s.' % unicode(e))
 
             logging.info('Dataset moved and is now known as: %s.' % dataset)
+
+            # Record the move in the checkpoint
+            self.checkpoint_add(dataset, CHECKPOINT_DATASET_MOVED)
         else:
             logging.info('Skipping move; already moved according to checkpoint.')
-
-        # Record the move in the checkpoint
-        self.checkpoint_add(dataset, CHECKPOINT_DATASET_MOVED)
 
         # Obtain Productstatus IDs for this product instance, and submit data files
         def productstatus_submit():
