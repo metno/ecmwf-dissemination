@@ -286,7 +286,15 @@ def test_dataset_name():
     """
     Test that the correct dataset name is returned.
     """
-    assert dataset.name() == 'BFS'
+    assert dataset.name() == 'BF'
+
+
+@with_setup(setup_real_files)
+def test_dataset_stream_use():
+    """
+    Test that the correct dataset stream use flag is returned.
+    """
+    assert dataset.stream_use() == 'S'
 
 
 @with_setup(setup_real_files)

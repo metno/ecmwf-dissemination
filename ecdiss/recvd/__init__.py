@@ -203,7 +203,8 @@ class Dataset(object):
 
         A filename looks like this:
         BFS11120600111511001
-        ^^^                     The stream definition name
+        ^^                      The stream definition name
+          ^                     ECMWF stream use
            ^^^^^^^^             Analysis start time, MMDDHHMM
                    ^^^^^^^^     Analysis end time, MMDDHHMM
                            ^    Dataset version
@@ -216,9 +217,11 @@ class Dataset(object):
         try:
             self.filename_components['analysis_start_time'] = parse_filename_timestamp(start, now)
             self.filename_components['analysis_end_time'] = parse_filename_timestamp(end, now)
-            self.filename_components['name'] = filename[0:3]
+            self.filename_components['name'] = filename[0:2]
+            self.filename_components['stream_use'] = filename[2]
             self.filename_components['version'] = int(filename[19:])
         except ValueError:
+            self.filename_components = {}
             raise InvalidFilenameException('Filename %s does not match expected format' % self.data_filename())
 
     def analysis_start_time(self):
@@ -241,6 +244,13 @@ class Dataset(object):
         """
         self.parse_filename(datetime.datetime.now())
         return self.filename_components['name']
+
+    def stream_use(self):
+        """
+        Return the dataset name, according to the filename.
+        """
+        self.parse_filename(datetime.datetime.now())
+        return self.filename_components['stream_use']
 
     def version(self):
         """

@@ -9,6 +9,10 @@ from mock import MagicMock, Mock
 from nose.tools import raises
 
 
+def make_bogus_datasetpublisher(checkpoint, out_dir):
+    return DatasetPublisher(checkpoint, "http://hei.ho/", 120, None, None, out_dir, None)
+
+
 def setup_dirs():
     tmp_dir = tempfile.mkdtemp()
     in_dir = os.path.join(tmp_dir, "in")
@@ -23,19 +27,19 @@ def setup_dirs():
 
 def test_empty_directory():
     in_dir, out_dir, cp = setup_dirs()
-    dsp = DatasetPublisher(cp, "http://hei.ho/", 120, None, out_dir, None)
+    dsp = make_bogus_datasetpublisher(cp, out_dir)
     dsp.process_directory(in_dir)
 
 
 def test_empty_checkpoint():
     in_dir, out_dir, cp = setup_dirs()
-    dsp = DatasetPublisher(cp, "http://hei.ho/", 120, None, out_dir, None)
+    dsp = make_bogus_datasetpublisher(cp, out_dir)
     dsp.process_incomplete_checkpoints([out_dir, in_dir])
 
 
 def test_process_only_data():
     in_dir, out_dir, cp = setup_dirs()
-    dsp = DatasetPublisher(cp, "http://hei.ho/", 120, None, out_dir, None)
+    dsp = make_bogus_datasetpublisher(cp, out_dir)
 
     data_name = os.path.join(in_dir, "foo")
     with open(data_name, 'wb') as data:
@@ -46,7 +50,7 @@ def test_process_only_data():
 
 def test_process_only_md5():
     in_dir, out_dir, cp = setup_dirs()
-    dsp = DatasetPublisher(cp, "http://hei.ho/", 120, None, out_dir, None)
+    dsp = make_bogus_datasetpublisher(cp, out_dir)
 
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + '.md5'
@@ -59,7 +63,7 @@ def test_process_only_md5():
 @raises(ecdiss.recvd.InvalidFilenameException)
 def test_process_bad_fileformat():
     in_dir, out_dir, cp = setup_dirs()
-    dsp = DatasetPublisher(cp, "http://hei.ho/", 120, None, out_dir, None)
+    dsp = make_bogus_datasetpublisher(cp, out_dir)
 
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + '.md5'
@@ -80,9 +84,16 @@ def test_process_data():
     mock_productstatus_api.datainstance.create = Mock(return_value=mock_datainstance)
 
     productstatus_service_backend = '1234-1234-4321-4321'
+    productstatus_source = '0303-9090-6060-4040'
     base_url = "http://hei.ho/"
 
-    dsp = DatasetPublisher(cp, base_url, 120, productstatus_service_backend, out_dir, mock_productstatus_api)
+    dsp = DatasetPublisher(cp,
+                           base_url,
+                           120,
+                           productstatus_service_backend,
+                           productstatus_source,
+                           out_dir,
+                           mock_productstatus_api)
 
     data_filename = "BFS11120600111511001"
     data_name = os.path.join(in_dir, data_filename)
@@ -94,7 +105,7 @@ def test_process_data():
 
     dsp.process_file(md5_name)
 
-    mock_productstatus_api.product.objects.filter.assert_called_once_with(foreign_id='BFS', foreign_id_type='ecmwf')
+    mock_productstatus_api.product.objects.filter.assert_called_once_with(source_key='BF', source=productstatus_source)
     mock_productstatus_api.dataformat.objects.filter.assert_called_once_with(name='GRIB')
     assert mock_datainstance.servicebackend == productstatus_service_backend
     assert mock_datainstance.url == base_url + data_filename

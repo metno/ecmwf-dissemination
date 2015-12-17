@@ -36,13 +36,17 @@ def run():
         api_key=config_parser.get('productstatus', 'api_key'),
         verify_ssl=config_parser.getboolean('productstatus', 'verify_ssl'),
     )
-    productstatus_service_backend = productstatus_api.servicebackend[config_parser.get('hosting', 'service_backend')]
+    productstatus_service_backend = \
+        productstatus_api.servicebackend[config_parser.get('hosting', 'service_backend')]
+    productstatus_source = \
+        productstatus_api.institution[config_parser.get('productstatus', 'source_uuid')]
 
     publisher = ecdiss.recvd.daemon.DatasetPublisher(
         checkpoint,
         config_parser.get('hosting', 'base_url'),
         int(config_parser.get('hosting', 'file_lifetime')),
         productstatus_service_backend,
+        productstatus_source,
         destination_directory,
         productstatus_api,
     )

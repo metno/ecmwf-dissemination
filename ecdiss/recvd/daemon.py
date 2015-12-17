@@ -138,6 +138,7 @@ class DatasetPublisher(object):
                  ecdiss_base_url,
                  dataset_lifetime,
                  productstatus_service_backend,
+                 productstatus_source,
                  output_path,
                  productstatus_api,
                  ):
@@ -148,6 +149,7 @@ class DatasetPublisher(object):
         self.checkpoint = checkpoint
         self.productstatus = productstatus_api
         self.productstatus_service_backend = productstatus_service_backend
+        self.productstatus_source = productstatus_source
 
     def get_dataset_key(self, dataset):
         return dataset.data_filename()
@@ -182,7 +184,7 @@ class DatasetPublisher(object):
         Productstatus server, or None if no matching product is found.
         """
         name = dataset.name()
-        qs = self.productstatus.product.objects.filter(foreign_id=name, foreign_id_type='ecmwf')
+        qs = self.productstatus.product.objects.filter(source_key=name, source=self.productstatus_source)
         name_desc = "ECMWF stream name '%s'" % name
         if qs.count() == 0:
             raise ecdiss.recvd.EcdissProductstatusException(
