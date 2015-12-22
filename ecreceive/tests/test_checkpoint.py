@@ -1,9 +1,8 @@
-from ecdiss.recvd.daemon import Checkpoint
-
 import tempfile
 
-from nose.tools import raises  # , with_setup
-# from unittest.case import SkipTest
+import ecreceive.checkpoint
+
+from nose.tools import raises
 
 
 def setup_with_tempfile(json):
@@ -11,7 +10,7 @@ def setup_with_tempfile(json):
     if json is not None:
         with open(tmpfile.name, 'w+b') as cp:
             cp.write(json)
-    return tmpfile, Checkpoint(tmpfile.name)
+    return tmpfile, ecreceive.checkpoint.Checkpoint(tmpfile.name)
 
 
 @raises(IOError)
@@ -20,7 +19,7 @@ def test_bogus_file_add():
     Test a Checkpoint with an invalid path
     raises an exception when making changes.
     """
-    c = Checkpoint('/this/is/no/file')
+    c = ecreceive.checkpoint.Checkpoint('/this/is/no/file')
     assert not c.keys()
     c.add('my-favourite-key', 1)
 
@@ -30,7 +29,7 @@ def test_bogus_file_delete():
     Test a Checkpoint with an invalid path
     raises an exception when adding a flag.
     """
-    c = Checkpoint('/this/is/no/file')
+    c = ecreceive.checkpoint.Checkpoint('/this/is/no/file')
     assert not c.keys()
     c.delete('my-favourite-key')
 
@@ -76,7 +75,7 @@ def test_add_save():
     checkpoint.add('a', 2)
     assert checkpoint.get('a') == 3
 
-    cp_reload = Checkpoint(tmpfile.name)
+    cp_reload = ecreceive.checkpoint.Checkpoint(tmpfile.name)
     assert cp_reload.get('a') == 3
 
 
@@ -88,7 +87,7 @@ def test_delete_save():
     assert checkpoint.get('a') == 1
 
     checkpoint.delete('a')
-    cp_reload = Checkpoint(tmpfile.name)
+    cp_reload = ecreceive.checkpoint.Checkpoint(tmpfile.name)
     assert not cp_reload.keys()
 
     assert checkpoint.get('a') == 0
@@ -101,5 +100,5 @@ def test_get_nosave():
     tmpfile, checkpoint = setup_with_tempfile('{"a": 1}')
     assert checkpoint.get('b') == 0
 
-    cp_reload = Checkpoint(tmpfile.name)
+    cp_reload = ecreceive.checkpoint.Checkpoint(tmpfile.name)
     assert 'b' not in cp_reload.keys()

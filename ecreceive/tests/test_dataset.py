@@ -1,11 +1,13 @@
-import ecdiss.recvd
 import tempfile
 import datetime
 import dateutil.tz
 import os
 
+import ecreceive
+import ecreceive.dataset
+import ecreceive.exceptions
+
 from nose.tools import with_setup, raises
-# from unittest.case import SkipTest
 
 dataset = None
 
@@ -15,7 +17,7 @@ def setup_bogus():
     Setup function: set up a bogus dataset.
     """
     global dataset
-    dataset = ecdiss.recvd.Dataset('/tmp/foo')
+    dataset = ecreceive.dataset.Dataset('/tmp/foo')
 
 
 def setup_real_files():
@@ -24,7 +26,7 @@ def setup_real_files():
     """
     global dataset
     path = os.path.join(os.path.dirname(__file__), 'fixtures', 'BFS11120600111511001')
-    dataset = ecdiss.recvd.Dataset(path)
+    dataset = ecreceive.dataset.Dataset(path)
 
 
 def setup_temporary_files():
@@ -36,7 +38,7 @@ def setup_temporary_files():
     md5 = open(data.name + '.md5', 'w+b')
     data.write('test\n')
     md5.write('d8e8fca2dc0f896fd7cb4cb0031ba249')
-    dataset = ecdiss.recvd.Dataset(data.name)
+    dataset = ecreceive.dataset.Dataset(data.name)
 
 
 def teardown_temporary_files():
@@ -52,7 +54,7 @@ def test_init_data():
     Test that instantiation of a Dataset object will derive correct data and
     md5sum file paths, using a path to the data set.
     """
-    dataset = ecdiss.recvd.Dataset('/tmp/foo')
+    dataset = ecreceive.dataset.Dataset('/tmp/foo')
     assert dataset.data_path == '/tmp/foo'
     assert dataset.md5_path == '/tmp/foo.md5'
 
@@ -62,7 +64,7 @@ def test_init_md5():
     Test that instantiation of a Dataset object will derive correct data and
     md5sum file paths, using a path to the md5sum control file.
     """
-    dataset = ecdiss.recvd.Dataset('/tmp/foo.md5')
+    dataset = ecreceive.dataset.Dataset('/tmp/foo.md5')
     assert dataset.data_path == '/tmp/foo'
     assert dataset.md5_path == '/tmp/foo.md5'
 
@@ -92,7 +94,7 @@ def test_md5_to_data_path():
     assert dataset.md5_to_data_path('/path/to/foo/bar.md5') == '/path/to/foo/bar'
 
 
-@raises(ecdiss.recvd.EcdissException)
+@raises(ecreceive.exceptions.ECReceiveException)
 @with_setup(setup_bogus)
 def test_invalid_md5_to_data_path():
     """
@@ -184,7 +186,7 @@ def test_read_md5sum():
     assert dataset.md5_key == '634eece2300fef37519acec88fc6f2d8'
 
 
-@raises(ecdiss.recvd.EcdissException)
+@raises(ecreceive.exceptions.ECReceiveException)
 @with_setup(setup_bogus)
 def test_read_md5sum_missing():
     """
@@ -194,7 +196,7 @@ def test_read_md5sum_missing():
     dataset.read_md5sum()
 
 
-@raises(ecdiss.recvd.InvalidDataException)
+@raises(ecreceive.exceptions.InvalidDataException)
 @with_setup(setup_temporary_files, teardown_temporary_files)
 def test_read_md5sum_too_short():
     """
@@ -214,7 +216,7 @@ def test_calculate_md5sum():
     assert dataset.md5_result == '634eece2300fef37519acec88fc6f2d8'
 
 
-@raises(ecdiss.recvd.EcdissException)
+@raises(ecreceive.exceptions.ECReceiveException)
 @with_setup(setup_temporary_files)
 def test_calculate_md5sum_missing():
     """
@@ -272,7 +274,7 @@ def test_move_nonexistent_directory():
     dataset.move('/dev/null/nonexistent/directory')
 
 
-@raises(ecdiss.recvd.EcdissException)
+@raises(ecreceive.exceptions.ECReceiveException)
 @with_setup(setup_bogus)
 def test_move_incomplete_dataset():
     """
@@ -329,7 +331,7 @@ def test_analysis_end_time():
 
 
 @with_setup(setup_bogus)
-@raises(ecdiss.recvd.EcdissException)
+@raises(ecreceive.exceptions.ECReceiveException)
 def test_reference_times_missing_dataset():
     """
     Test that an exception is thrown when trying to read reference times from a

@@ -1,4 +1,4 @@
-from ecdiss.recvd import force_utc, parse_filename_timestamp
+from ecreceive import force_utc, parse_filename_timestamp
 
 import datetime
 import dateutil.tz

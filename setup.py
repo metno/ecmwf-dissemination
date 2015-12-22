@@ -4,7 +4,7 @@ except ImportError:
     from distutils.core import setup
 
 config = {
-    'description': 'ECDISS daemons',
+    'description': 'ECReceive daemon',
     'author': 'IT-GEO-TF',
     'url': 'https://github.com/metno/ecmwf-dissemination',
     'download_url': 'https://github.com/metno/ecmwf-dissemination',
@@ -17,10 +17,11 @@ config = {
         'productstatus-client==3.0.0',
         'mock==1.3.0',
         'funcsigs==0.4',
+        'pyzmq==15.1.0',
     ],
     'packages': [],
     'scripts': [],
-    'name': 'ecdiss'
+    'name': 'ecreceive'
 }
 
 setup(**config)
