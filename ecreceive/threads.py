@@ -257,12 +257,12 @@ class MainThread(object):
             'productstatus_username': config_parser.get('productstatus', 'username'),
             'productstatus_api_key': config_parser.get('productstatus', 'api_key'),
             'productstatus_verify_ssl': config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': config_parser.get('hosting', 'service_backend'),
+            'productstatus_service_backend': config_parser.get('productstatus', 'service_backend_uuid'),
             'productstatus_source': config_parser.get('productstatus', 'source_uuid'),
-            'base_url': config_parser.get('hosting', 'base_url'),
-            'file_lifetime': config_parser.getint('hosting', 'file_lifetime'),
-            'destination_directory': config_parser.get('ecmwf', 'destination_directory'),
-            'spool_directory': config_parser.get('ecmwf', 'spool_directory'),
+            'base_url': config_parser.get('productstatus', 'datainstance_base_url'),
+            'file_lifetime': config_parser.getint('productstatus', 'datainstance_lifetime'),
+            'destination_directory': config_parser.get('ecreceive', 'destination_directory'),
+            'spool_directory': config_parser.get('ecreceive', 'spool_directory'),
         }
 
         # Set up processing threads.
