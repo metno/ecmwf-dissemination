@@ -319,20 +319,19 @@ class DatasetPublisher(object):
 
     def get_or_post_productinstance_resource(self, dataset):
         """
-        Return a matching ProductRun resource according to Product and reference time.
+        Return a matching ProductInstance resource according to Product, reference time and version.
         """
         product = self.get_productstatus_product(dataset)
         parameters = {
             'product': product,
             'reference_time': dataset.analysis_start_time(),
-            # FIXME: add version to POST, see T2084
+            'version': dataset.version()
         }
-        order_by = '-version'
-        return ecreceive.productstatus_get_or_post(self.productstatus.productinstance, parameters, order_by)
+        return ecreceive.productstatus_get_or_post(self.productstatus.productinstance, parameters)
 
     def get_or_post_data_resource(self, productinstance, dataset):
         """
-        Return a matching Data resource according to ProductRun and data file
+        Return a matching Data resource according to ProductInstance and data file
         begin/end times.
         """
         parameters = {
