@@ -372,7 +372,7 @@ class DatasetPublisher(object):
             full_path = None
 
         if not full_path:
-            logging.warning('File is not present in any directory. Possible race condition?')
+            logging.info('Files are not present in any directory. Possible race condition; ignoring.')
             return False
 
         # Instantiate Dataset object
@@ -394,14 +394,15 @@ class DatasetPublisher(object):
 
         # Check if contents matches md5sum
         try:
+            logging.info('%s: now calculating md5sum, this might take a while...' % dataset)
             if not dataset.valid():
-                logging.warning('md5sum mismatch: data=%s, control=%s.' %
-                                (dataset.md5_result, dataset.md5_key))
+                logging.error('md5sum mismatch: data=%s, control=%s.' %
+                              (dataset.md5_result, dataset.md5_key))
                 self.checkpoint_unlock(dataset)
                 return False
             logging.info('Calculated md5sum matches reference file: %s.' % dataset.md5_result)
         except ecreceive.exceptions.InvalidDataException, e:
-            logging.warning('Validation error: %s.' % unicode(e))
+            logging.error('md5sum validation error: %s.' % unicode(e))
             self.checkpoint_unlock(dataset)
             return False
 
