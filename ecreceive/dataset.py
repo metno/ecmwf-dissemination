@@ -327,7 +327,7 @@ class DatasetPublisher(object):
             'reference_time': dataset.analysis_start_time(),
             'version': dataset.version()
         }
-        return ecreceive.productstatus_get_or_post(self.productstatus.productinstance, parameters)
+        return self.productstatus.productinstance.find_or_create(parameters)
 
     def get_or_post_data_resource(self, productinstance, dataset):
         """
@@ -339,7 +339,7 @@ class DatasetPublisher(object):
             'time_period_begin': dataset.analysis_start_time(),
             'time_period_end': dataset.analysis_end_time(),
         }
-        return ecreceive.productstatus_get_or_post(self.productstatus.data, parameters)
+        return self.productstatus.data.find_or_create(parameters)
 
     def post_datainstance_resource(self, data, dataset):
         """

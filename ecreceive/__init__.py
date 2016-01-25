@@ -80,29 +80,3 @@ def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_
                 logfunc = logging.info
             logfunc('Action failed, retrying in %d seconds: %s' % (interval, e))
             time.sleep(interval)
-
-
-def productstatus_get_or_post(collection, data, order_by=None):
-    """
-    Search for a certain resource type at the Productstatus server, matching
-    the given parameters in the `data` variable. If no records are found,
-    one is created using a POST request. Returns a single Resource object.
-    """
-    # search for existing
-    qs = collection.objects
-    qs.filter(**data)
-    if order_by:
-        qs.order_by(order_by)
-
-    # create if not found
-    if qs.count() == 0:
-        logging.info('No matching %s resource found, creating...' % collection._resource_name)
-        resource = collection.create()
-        [setattr(resource, key, value) for key, value in data.iteritems()]
-        resource.save()
-        logging.info('%s: resource created' % resource)
-    else:
-        resource = qs[0]
-        logging.info('%s: using existing resource' % resource)
-
-    return resource

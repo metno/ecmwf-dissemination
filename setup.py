@@ -14,7 +14,7 @@ config = {
         'nose==1.3.7',
         'inotify==0.2.4',
         'python-dateutil==2.4.2',
-        'productstatus-client==3.0.0',
+        'productstatus-client==3.1.3',
         'mock==1.3.0',
         'funcsigs==0.4',
         'pyzmq==15.1.0',
