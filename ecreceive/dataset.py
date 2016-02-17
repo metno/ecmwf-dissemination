@@ -333,10 +333,11 @@ class DatasetPublisher(object):
         """
         Return a matching Data resource according to ProductInstance and data file
         begin/end times.
+        We are using time_period_begin = time_period_end = The forecast for hour time_period_end
         """
         parameters = {
             'productinstance': productinstance,
-            'time_period_begin': dataset.analysis_start_time(),
+            'time_period_begin': dataset.analysis_end_time(),
             'time_period_end': dataset.analysis_end_time(),
         }
         return self.productstatus.data.find_or_create(parameters)
