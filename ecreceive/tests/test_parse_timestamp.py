@@ -49,6 +49,17 @@ def test_parse_filename_timestamp_previous_year():
     assert timestamp == comparison_timestamp
 
 
+def test_parse_filename_timestamp_leap_year():
+    """
+    Test that the timestamp parser works correctly when parsing a leap year
+    with the date of February 29th.
+    """
+    now = datetime.datetime(2016, 2, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2016, 2, 29, 3, 0, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = parse_filename_timestamp('02290300', now)
+    assert timestamp == comparison_timestamp
+
+
 def test_parse_filename_timestamp_missing_time():
     """
     Test that the timestamp parser works with timestamps that are missing hour

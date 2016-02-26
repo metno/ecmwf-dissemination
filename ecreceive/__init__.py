@@ -23,18 +23,18 @@ def parse_filename_timestamp(stamp, now):
     """
     if stamp == '________':
         return None
+    stamp = '%d%s' % (now.year, stamp)
     try:
-        ts = datetime.datetime.strptime(stamp, '%m%d%H%M')
+        ts = datetime.datetime.strptime(stamp, '%Y%m%d%H%M')
     except ValueError:
-        ts = datetime.datetime.strptime(stamp, '%m%d____')
+        ts = datetime.datetime.strptime(stamp, '%Y%m%d____')
     ts = force_utc(ts)
-    year = now.year
     if now.month < ts.month:
         # assume that if current timestamp's month is lower than dataset
         # filename's month, a year change has taken place, and we are
         # processing last year's dataset.
-        year -= 1
-    return ts.replace(year=year)
+        ts = ts.replace(year=now.year - 1)
+    return ts
 
 
 def run_with_exception_logging(func):
