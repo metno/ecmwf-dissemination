@@ -107,7 +107,10 @@ class DirectoryWatcherThread(ZMQThread):
         header, attribs, path, filename = event
         if 'IN_CLOSE_WRITE' not in attribs:
             return
-        logging.info('Filesystem has IN_CLOSE_WRITE event, sending process request for %s' % filename)
+        logging.info('Filesystem has IN_CLOSE_WRITE event for %s' % filename)
+        if not filename.endswith('.md5'):
+            logging.info('Ignoring non-md5sum input file.')
+            return
         self.socket.send(filename)
 
     def run_inner(self):
