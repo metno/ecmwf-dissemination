@@ -8,9 +8,6 @@ import ecreceive.exceptions
 import productstatus.exceptions
 
 
-READ_BUFFER = 8192
-
-
 class Dataset(object):
     """
     The Dataset class represents a combination of a data file and its md5sum
@@ -98,7 +95,7 @@ class Dataset(object):
             raise ecreceive.exceptions.ECReceiveException('Cannot calculate md5sum without a data file')
         with open(self.data_path, 'r') as f:
             while True:
-                data = f.read(READ_BUFFER)
+                data = f.read(256*128)  # md5 block size is 128
                 if len(data) == 0:
                     break
                 h.update(data)
