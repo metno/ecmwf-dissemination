@@ -111,6 +111,11 @@ class Dataset(object):
             self.calculate_md5sum()
         return self.md5_key == self.md5_result
 
+    def md5(self):
+        if not self.md5_result:
+            self.calculate_md5sum()
+        return self.md5_result
+
     def data_filename(self):
         """
         Return the filename part of the data file path.
@@ -350,6 +355,8 @@ class DatasetPublisher(object):
         resource.format = self.get_productstatus_dataformat(dataset)
         resource.servicebackend = self.productstatus.servicebackend[self.productstatus_service_backend_uuid]
         resource.url = self.ecreceive_base_url + dataset.data_filename()
+        resource.hash = dataset.md5()
+        resource.hash_type = 'md5'
         resource.save()
         return resource
 
