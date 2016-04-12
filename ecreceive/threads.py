@@ -326,6 +326,9 @@ class MainThread(object):
                         ecreceive.exceptions.ECReceiveProductstatusException
                     )
                 )
+
+                index += 1
+
             except Exception, e:
                 logging.critical("Error when deleting file '%s': %s", path, e)
                 raise
