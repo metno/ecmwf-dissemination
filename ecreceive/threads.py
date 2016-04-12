@@ -6,6 +6,8 @@ import os
 import glob
 import logging
 import logging.config
+import datetime
+import dateutil.tz
 import argparse
 import ConfigParser
 import zmq
@@ -241,6 +243,8 @@ class MainThread(object):
         self.argument_parser = argparse.ArgumentParser()
         self.argument_parser.add_argument('--config', action='store', required=True,
                                           help='Path to configuration file')
+        self.argument_parser.add_argument('--clean', action='store_true',
+                                          help='Clean up old files in destination directory')
 
         # Parse command-line arguments.
         self.args = self.argument_parser.parse_args()
@@ -267,6 +271,64 @@ class MainThread(object):
             'destination_directory': self.config_parser.get('ecreceive', 'destination_directory'),
             'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
         }
+
+    def clean(self):
+        """!
+        @brief Clean up old files in destination directory.
+        """
+        logging.info('Cleaning up old files in destination directory %s',
+                     self.kwargs['destination_directory'])
+
+        # Instantiate API client
+        api = productstatus.api.Api(
+            self.kwargs['productstatus_url'],
+            username=self.kwargs['productstatus_username'],
+            api_key=self.kwargs['productstatus_api_key'],
+            verify_ssl=self.kwargs['productstatus_verify_ssl'],
+        )
+
+        # Get a queryset of all expired files
+        logging.info('Fetching a list of all expired DataInstance resources in my storage...')
+        now = datetime.datetime.now().replace(tzinfo=dateutil.tz.tzutc())
+        datainstances = api.datainstance.objects.filter(
+            data__productinstance__product__source=api.institution[self.kwargs['productstatus_source']],
+            servicebackend=api.servicebackend[self.kwargs['productstatus_service_backend']],
+            expires__lte=now,
+            deleted=False,
+        ).order_by('-expires')
+
+        # Loop through and delete expired files
+        index = 0
+        total = datainstances.count()
+        logging.info('Found a total of %d expired resources, will now delete them.', total)
+        for datainstance in datainstances:
+            logging.info('[%d/%d] %s, URL %s',
+                         index + 1,
+                         total,
+                         datainstance,
+                         datainstance.url)
+            path = datainstance.url.replace(self.kwargs['base_url'], '').lstrip('/')
+            path = os.path.join(self.kwargs['destination_directory'], path)
+
+            try:
+                if not os.path.exists(path):
+                    logging.error("File does not exist: '%s'", path)
+                else:
+                    os.unlink(path)
+                    logging.info("Deleted file: '%s'", path)
+
+                logging.info("Registering deletion with Productstatus...")
+                datainstance.deleted = True
+                ecreceive.retry_n(
+                    datainstance.save,
+                    exceptions=(
+                        productstatus.exceptions.ServiceUnavailableException,
+                        ecreceive.exceptions.ECReceiveProductstatusException
+                    )
+                )
+            except Exception, e:
+                logging.critical("Error when deleting file '%s': %s", path, e)
+                raise
 
     def main(self):
 
@@ -317,8 +379,14 @@ class MainThread(object):
         # Read configuration.
         self.setup_configuration()
 
+        # Determine which function to run
+        if self.args.clean:
+            func = self.clean
+        else:
+            func = self.main
+
         # Catch and log all exceptions
-        rc = ecreceive.run_with_exception_logging(self.main)
+        rc = ecreceive.run_with_exception_logging(func)
 
         # Kill threads
         logging.info('Received shutdown signal, waiting %d seconds for each thread to complete...' % THREAD_GRACE)
