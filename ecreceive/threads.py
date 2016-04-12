@@ -237,52 +237,54 @@ class MainThread(object):
             self.job_submit_socket.send_string(f)
         logging.info('Finished processing incomplete checkpoints.')
 
-    def main(self):
-        argument_parser = argparse.ArgumentParser()
-        argument_parser.add_argument('--config', action='store', required=True,
-                                     help='Path to configuration file')
+    def setup_configuration(self):
+        self.argument_parser = argparse.ArgumentParser()
+        self.argument_parser.add_argument('--config', action='store', required=True,
+                                          help='Path to configuration file')
 
         # Parse command-line arguments.
-        args = argument_parser.parse_args()
+        self.args = self.argument_parser.parse_args()
 
         # Configure logging.
-        logging.config.fileConfig(args.config)
+        logging.config.fileConfig(self.args.config)
 
         logging.info('Starting up ECMWF dissemination receiver.')
 
         # Read configuration file.
-        config_parser = ConfigParser.SafeConfigParser()
-        config_parser.read(args.config)
+        self.config_parser = ConfigParser.SafeConfigParser()
+        self.config_parser.read(self.args.config)
 
         # Collect parameters for the worker threads.
-        kwargs = {
-            'productstatus_url': config_parser.get('productstatus', 'url'),
-            'productstatus_username': config_parser.get('productstatus', 'username'),
-            'productstatus_api_key': config_parser.get('productstatus', 'api_key'),
-            'productstatus_verify_ssl': config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': config_parser.get('productstatus', 'service_backend_uuid'),
-            'productstatus_source': config_parser.get('productstatus', 'source_uuid'),
-            'base_url': config_parser.get('productstatus', 'datainstance_base_url'),
-            'file_lifetime': config_parser.getint('productstatus', 'datainstance_lifetime'),
-            'destination_directory': config_parser.get('ecreceive', 'destination_directory'),
-            'spool_directory': config_parser.get('ecreceive', 'spool_directory'),
+        self.kwargs = {
+            'productstatus_url': self.config_parser.get('productstatus', 'url'),
+            'productstatus_username': self.config_parser.get('productstatus', 'username'),
+            'productstatus_api_key': self.config_parser.get('productstatus', 'api_key'),
+            'productstatus_verify_ssl': self.config_parser.getboolean('productstatus', 'verify_ssl'),
+            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_uuid'),
+            'productstatus_source': self.config_parser.get('productstatus', 'source_uuid'),
+            'base_url': self.config_parser.get('productstatus', 'datainstance_base_url'),
+            'file_lifetime': self.config_parser.getint('productstatus', 'datainstance_lifetime'),
+            'destination_directory': self.config_parser.get('ecreceive', 'destination_directory'),
+            'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
         }
 
+    def main(self):
+
         # Set up processing threads.
-        num_threads = config_parser.getint('ecreceive', 'worker_threads')
+        num_threads = self.config_parser.getint('ecreceive', 'worker_threads')
         for i in range(num_threads):
-            thread = WorkerThread(**kwargs)
+            thread = WorkerThread(**self.kwargs)
             thread.start()
             self.threads += [thread]
 
         # Set up the checkpoint writer thread.
-        checkpoint_file = config_parser.get('ecreceive', 'checkpoint_file')
+        checkpoint_file = self.config_parser.get('ecreceive', 'checkpoint_file')
         checkpoint_thread = CheckpointThread(checkpoint_file)
         checkpoint_thread.start()
         self.threads += [checkpoint_thread]
 
         # Set up the inotify thread.
-        inotify_thread = DirectoryWatcherThread(kwargs['spool_directory'])
+        inotify_thread = DirectoryWatcherThread(self.kwargs['spool_directory'])
         inotify_thread.start()
         self.threads += [inotify_thread]
 
@@ -297,10 +299,10 @@ class MainThread(object):
 
         # Run unfinished processing
         self.process_incomplete_checkpoints([
-            kwargs['destination_directory'],
-            kwargs['spool_directory'],
+            self.kwargs['destination_directory'],
+            self.kwargs['spool_directory'],
         ])
-        self.process_directory(kwargs['spool_directory'])
+        self.process_directory(self.kwargs['spool_directory'])
 
         # The program is now running until a signal is received on
         # ZMQ_KILL_SOCKET, or an exception is triggered.
@@ -311,6 +313,10 @@ class MainThread(object):
             pass
 
     def run(self):
+
+        # Read configuration.
+        self.setup_configuration()
+
         # Catch and log all exceptions
         rc = ecreceive.run_with_exception_logging(self.main)
 
