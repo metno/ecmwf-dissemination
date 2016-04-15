@@ -25,8 +25,8 @@ def get_all_metrics(path):
     return {
         'count': {
             'data': get_files_count(files, ''),
-            'tmp': get_files_count(files, 'tmp'),
-            'md5': get_files_count(files, 'md5'),
+            'tmp': get_files_count(files, '.tmp'),
+            'md5': get_files_count(files, '.md5'),
         },
         'size': get_files_size(files),
     }
