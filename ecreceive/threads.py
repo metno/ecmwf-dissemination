@@ -311,11 +311,8 @@ class MainThread(object):
             path = os.path.join(self.kwargs['destination_directory'], path)
 
             try:
-                if not os.path.exists(path):
-                    logging.error("File does not exist: '%s'", path)
-                else:
-                    os.unlink(path)
-                    logging.info("Deleted file: '%s'", path)
+                dataset = ecreceive.dataset.Dataset(path)
+                dataset.delete()
 
                 logging.info("Registering deletion with Productstatus...")
                 datainstance.deleted = True

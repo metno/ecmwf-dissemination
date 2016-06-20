@@ -75,6 +75,21 @@ class Dataset(object):
         """
         return self.has_data_file() and self.has_md5_file()
 
+    def delete(self):
+        """!
+        @brief Delete both files in the dataset.
+        """
+        if self.has_data_file():
+            logging.info("Deleted data file: '%s'", self.data_path)
+            os.unlink(self.data_path)
+        else:
+            logging.error("Data file does not exist: '%s'", self.data_path)
+        if self.has_md5_file():
+            logging.info("Deleted md5sum file: '%s'", self.md5_path)
+            os.unlink(self.md5_path)
+        else:
+            logging.error("md5sum file does not exist: '%s'", self.md5_path)
+
     def read_md5sum(self):
         """
         Read the contents of the md5sum file into memory.
