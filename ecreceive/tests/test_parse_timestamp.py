@@ -43,9 +43,20 @@ def test_parse_filename_timestamp_previous_year():
     Test that the timestamp parser works correctly when parsing timestamps from
     the previous year.
     """
-    now = datetime.datetime(2015, 3, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
-    comparison_timestamp = datetime.datetime(2014, 6, 1, 13, 25, 0, tzinfo=dateutil.tz.tzutc())
-    timestamp = parse_filename_timestamp('06011325', now)
+    now = datetime.datetime(2015, 1, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2014, 12, 1, 13, 25, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = parse_filename_timestamp('12011325', now)
+    assert timestamp == comparison_timestamp
+
+
+def test_parse_filename_timestamp_next_year():
+    """
+    Test that the timestamp year is derived correctly for cases when the date of the forecast
+    is in the next month compared to the current date, and in the next year.
+    """
+    now = datetime.datetime(2015, 12, 12, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2016, 1, 6, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = parse_filename_timestamp('01060000', now)
     assert timestamp == comparison_timestamp
 
 
@@ -57,16 +68,6 @@ def test_parse_filename_timestamp_leap_year():
     now = datetime.datetime(2016, 2, 1, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
     comparison_timestamp = datetime.datetime(2016, 2, 29, 3, 0, 0, tzinfo=dateutil.tz.tzutc())
     timestamp = parse_filename_timestamp('02290300', now)
-    assert timestamp == comparison_timestamp
-
-def test_parse_filename_timestamp_end_of_month():
-    """
-    Test that the timestamp year is derived correctly for cases when the date of the forecast
-    is in the next month compared to the current date
-    """
-    now = datetime.datetime(2016, 5, 30, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
-    comparison_timestamp = datetime.datetime(2016, 6, 2, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
-    timestamp = parse_filename_timestamp('06020000', now)
     assert timestamp == comparison_timestamp
 
 

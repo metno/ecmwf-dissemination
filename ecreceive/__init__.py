@@ -1,8 +1,10 @@
 import time
+import copy
 import logging
 import traceback
 import datetime
 import dateutil.tz
+import dateutil.relativedelta
 
 
 def force_utc(timestamp):
@@ -29,11 +31,16 @@ def parse_filename_timestamp(stamp, now):
     except ValueError:
         ts = datetime.datetime.strptime(stamp, '%Y%m%d____')
     ts = force_utc(ts)
-    if now.month < ts.month:
-        # assume that if current timestamp's month is lower than dataset
-        # filename's month, a year change has taken place, and we are
-        # processing last year's dataset.
-        ts = ts.replace(year=now.year - 1)
+
+    # Check whether the dataset timestamp contains a different month than the
+    # current month. If so, it may be set in a different year, which is not
+    # specified in the timestamp. This is a workaround for that, assuring that
+    # the correct year is used.
+    for delta in [-1, 1]:
+        ts_alternate = copy.copy(now)
+        ts_alternate += dateutil.relativedelta.relativedelta(months=delta)
+        if ts_alternate.month == ts.month:
+            ts = ts.replace(year=ts_alternate.year)
     return ts
 
 
