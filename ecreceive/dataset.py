@@ -180,6 +180,9 @@ class Dataset(object):
            ^^^^^^^^             Analysis start time, MMDDHHMM
                    ^^^^^^^^     Analysis end time, MMDDHHMM
                            ^    Dataset version
+
+        For details see:
+        http://www.ecmwf.int/en/forecasts/documentation-and-support/data-delivery/manage-transmission-ecpds/real-time-data-file
         """
         if self.filename_components:
             return
