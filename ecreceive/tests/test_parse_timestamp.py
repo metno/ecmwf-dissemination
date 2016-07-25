@@ -59,6 +59,16 @@ def test_parse_filename_timestamp_leap_year():
     timestamp = parse_filename_timestamp('02290300', now)
     assert timestamp == comparison_timestamp
 
+def test_parse_filename_timestamp_end_of_month():
+    """
+    Test that the timestamp year is derived correctly for cases when the date of the forecast
+    is in the next month compared to the current date
+    """
+    now = datetime.datetime(2016, 5, 30, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    comparison_timestamp = datetime.datetime(2016, 6, 2, 0, 0, 0, tzinfo=dateutil.tz.tzutc())
+    timestamp = parse_filename_timestamp('06020000', now)
+    assert timestamp == comparison_timestamp
+
 
 def test_parse_filename_timestamp_missing_time():
     """
