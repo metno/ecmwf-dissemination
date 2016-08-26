@@ -358,7 +358,7 @@ class DatasetPublisher(object):
         }
         return self.productstatus.data.find_or_create(parameters)
 
-    def get_or_post_post_datainstance_resource(self, data, dataset):
+    def get_or_post_datainstance_resource(self, data, dataset):
         """
         Create a DataInstance resource at the Productstatus server, referring to the
         given data set.
@@ -368,6 +368,7 @@ class DatasetPublisher(object):
             'format': self.get_productstatus_dataformat(dataset),
             'servicebackend': self.productstatus.servicebackend[self.productstatus_service_backend_key],
             'url': self.ecreceive_base_url + dataset.data_filename(),
+            'deleted': False,
         }
         extra_params = {
             'expires': ecreceive.force_utc(datetime.datetime.utcnow()) + self.dataset_lifetime,
@@ -417,7 +418,7 @@ class DatasetPublisher(object):
 
             # Create a DataInstance remote resource
             logging.info('Determining whether DataInstance resource exists...')
-            datainstance_resource = self.get_or_post_post_datainstance_resource(data_resource, dataset)
+            datainstance_resource = self.get_or_post_datainstance_resource(data_resource, dataset)
 
             # Everything has been saved at the remote server
             logging.info("Now publicly available at %s until %s." % (
