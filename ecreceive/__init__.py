@@ -50,7 +50,7 @@ def run_with_exception_logging(func):
     """
     try:
         exit_code = func()
-    except Exception, e:
+    except Exception as e:
         logging.critical("Fatal error: %s" % e)
         exception = traceback.format_exc().split("\n")
         logging.debug("***********************************************************")
@@ -74,7 +74,7 @@ def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_
     while True:
         try:
             return func()
-        except exceptions, e:
+        except exceptions as e:
             tries += 1
             if give_up > 0 and tries >= give_up:
                 logging.error('Action failed %d times, giving up: %s' % (give_up, e))

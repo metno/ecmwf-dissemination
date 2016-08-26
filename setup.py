@@ -12,9 +12,9 @@ config = {
     'version': '1.0.0',
     'install_requires': [
         'nose==1.3.7',
-        'inotify==0.2.4',
+        'inotify==0.2.7',
         'python-dateutil==2.4.2',
-        'productstatus-client==5.1.0',
+        'productstatus-client==6.0.6',
         'mock==1.3.0',
         'funcsigs==0.4',
         'pyzmq==15.1.0',

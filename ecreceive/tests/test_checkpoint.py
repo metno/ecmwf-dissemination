@@ -9,7 +9,7 @@ def setup_with_tempfile(json):
     tmpfile = tempfile.NamedTemporaryFile()
     if json is not None:
         with open(tmpfile.name, 'w+b') as cp:
-            cp.write(json)
+            cp.write(json.encode('ascii'))
     return tmpfile, ecreceive.checkpoint.Checkpoint(tmpfile.name)
 
 

@@ -3,6 +3,7 @@ import hashlib
 import logging
 import datetime
 
+import ecreceive
 import ecreceive.exceptions
 
 import productstatus.exceptions
@@ -96,8 +97,8 @@ class Dataset(object):
         """
         if not self.has_md5_file():
             raise ecreceive.exceptions.ECReceiveException('Cannot read md5sum without an md5sum file')
-        with open(self.md5_path, 'r') as f:
-            self.md5_key = f.read(32)
+        with open(self.md5_path, 'rb') as f:
+            self.md5_key = f.read(32).decode('ascii')
             if len(self.md5_key) != 32:
                 raise ecreceive.exceptions.InvalidDataException('md5sum file is less than 32 bytes')
 
@@ -108,7 +109,7 @@ class Dataset(object):
         h = hashlib.md5()
         if not self.has_data_file():
             raise ecreceive.exceptions.ECReceiveException('Cannot calculate md5sum without a data file')
-        with open(self.data_path, 'r') as f:
+        with open(self.data_path, 'rb') as f:
             while True:
                 data = f.read(256*128)  # md5 block size is 128
                 if len(data) == 0:
@@ -238,22 +239,19 @@ class Dataset(object):
         """
         Return the file type of this dataset.
         """
-        return 'GRIB'
+        return 'grib'
 
 
 class DatasetPublisher(object):
     """
-    Publish datasets from an 'incoming' directory to a destination directory,
-    and publish them on a Productstatus server.
+    Publish datasets from an 'incoming' directory to a Productstatus server.
 
     When a file is processed, the class checks whether the file is a) weather
     model data or b) its corresponding md5sum file. If both files exists, the
     pair is submitted for the following processing:
 
-        1. Validate the data file against the md5sum file
-        2. Move the file to its appointed location
-        3. Extract file information
-        4. Post dataset to the Productstatus service
+        1. Extract file information
+        2. Post dataset to the Productstatus service
 
     After processing is complete, the class forgets about the files.
     """
@@ -262,21 +260,19 @@ class DatasetPublisher(object):
                  checkpoint_socket,
                  ecreceive_base_url,
                  dataset_lifetime,
-                 productstatus_service_backend_uuid,
-                 productstatus_source_uuid,
+                 productstatus_service_backend_key,
+                 productstatus_source_key,
                  spool_path,
-                 destination_path,
                  productstatus_api,
                  ):
 
         self.ecreceive_base_url = ecreceive_base_url
         self.dataset_lifetime = datetime.timedelta(minutes=dataset_lifetime)
         self.spool_path = spool_path
-        self.destination_path = destination_path
         self.checkpoint_socket = checkpoint_socket
         self.productstatus = productstatus_api
-        self.productstatus_service_backend_uuid = productstatus_service_backend_uuid
-        self.productstatus_source_uuid = productstatus_source_uuid
+        self.productstatus_service_backend_key = productstatus_service_backend_key
+        self.productstatus_source_key = productstatus_source_key
 
     def get_dataset_key(self, dataset):
         return dataset.data_filename()
@@ -309,12 +305,12 @@ class DatasetPublisher(object):
         correct data format.
         """
         file_type = dataset.file_type()
-        qs = self.productstatus.dataformat.objects.filter(name=file_type)
-        if qs.count() == 0:
+        try:
+            resource = self.productstatus.dataformat[file_type]
+        except productstatus.exceptions.ResourceNotFoundException:
             raise ecreceive.exceptions.ECReceiveProductstatusException(
                 "Data format '%s' was not found on the Productstatus server" % file_type
             )
-        resource = qs[0]
         logging.info('%s: Productstatus dataformat for %s' % (resource, file_type))
         return resource
 
@@ -326,7 +322,7 @@ class DatasetPublisher(object):
         name = dataset.name()
         qs = self.productstatus.product.objects.filter(
             source_key=name,
-            source=self.productstatus.institution[self.productstatus_source_uuid]
+            source=self.productstatus.institution[self.productstatus_source_key]
         )
         name_desc = "ECMWF stream name '%s'" % name
         if qs.count() == 0:
@@ -362,21 +358,21 @@ class DatasetPublisher(object):
         }
         return self.productstatus.data.find_or_create(parameters)
 
-    def post_datainstance_resource(self, data, dataset):
+    def get_or_post_post_datainstance_resource(self, data, dataset):
         """
         Create a DataInstance resource at the Productstatus server, referring to the
         given data set.
         """
-        resource = self.productstatus.datainstance.create()
-        resource.data = data
-        resource.expires = datetime.datetime.now() + self.dataset_lifetime
-        resource.format = self.get_productstatus_dataformat(dataset)
-        resource.servicebackend = self.productstatus.servicebackend[self.productstatus_service_backend_uuid]
-        resource.url = self.ecreceive_base_url + dataset.data_filename()
-        resource.hash = dataset.md5()
-        resource.hash_type = 'md5'
-        resource.save()
-        return resource
+        parameters = {
+            'data': data,
+            'format': self.get_productstatus_dataformat(dataset),
+            'servicebackend': self.productstatus.servicebackend[self.productstatus_service_backend_key],
+            'url': self.ecreceive_base_url + dataset.data_filename(),
+        }
+        extra_params = {
+            'expires': ecreceive.force_utc(datetime.datetime.utcnow()) + self.dataset_lifetime,
+        }
+        return self.productstatus.datainstance.find_or_create(parameters, extra_params=extra_params)
 
     def process_file(self, filename):
         """
@@ -386,21 +382,14 @@ class DatasetPublisher(object):
 
         logging.info('===== %s: start processing =====' % filename)
 
-        # Check for the file in both spool and destination directories
-        for directory in [self.destination_path, self.spool_path]:
-            full_path = os.path.join(directory, filename)
-            logging.info('Checking if %s exists...' % full_path)
-            if os.path.exists(full_path):
-                break
-            full_path = None
-
-        if not full_path:
+        full_path = os.path.join(self.spool_path, filename)
+        if not os.path.exists(full_path):
             logging.info('Files are not present in any directory. Possible race condition; ignoring.')
             return False
 
         # Instantiate Dataset object
         dataset = ecreceive.dataset.Dataset(full_path)
-        logging.info(unicode(dataset))
+        logging.info(str(dataset))
 
         # Check if both files exist
         if not dataset.complete():
@@ -415,51 +404,20 @@ class DatasetPublisher(object):
         # Register a checkpoint for this dataset to indicate that it exists
         self.checkpoint_add(dataset, ecreceive.checkpoint.CHECKPOINT_DATASET_EXISTS)
 
-        # Check if contents matches md5sum
-        try:
-            logging.info('%s: now calculating md5sum, this might take a while...' % dataset)
-            if not dataset.valid():
-                logging.error('md5sum mismatch: data=%s, control=%s.' %
-                              (dataset.md5_result, dataset.md5_key))
-                self.checkpoint_unlock(dataset)
-                return False
-            logging.info('Calculated md5sum matches reference file: %s.' % dataset.md5_result)
-        except ecreceive.exceptions.InvalidDataException, e:
-            logging.error('md5sum validation error: %s.' % unicode(e))
-            self.checkpoint_unlock(dataset)
-            return False
-
-        # Move the files to their proper location
-        if not (self.checkpoint_get(dataset) & ecreceive.checkpoint.CHECKPOINT_DATASET_MOVED):
-            try:
-                dataset.move(self.destination_path)
-            except ecreceive.exceptions.ECReceiveException, e:
-                logging.error('Error when moving: %s.' % unicode(e))
-                raise ecreceive.exceptions.TryAgainException('Dataset cannot be moved')
-
-            logging.info('Dataset moved and is now known as: %s.' % dataset)
-
-            # Record the move in the checkpoint
-            self.checkpoint_add(dataset, ecreceive.checkpoint.CHECKPOINT_DATASET_MOVED)
-        else:
-            logging.info('Skipping move; already moved according to checkpoint.')
-
         # Obtain Productstatus IDs for this product instance, and submit data files
         def productstatus_submit():
 
             # Get or create a ProductInstance remote resource
             logging.info('Determining which ProductInstance to post to...')
             productinstance_resource = self.get_or_post_productinstance_resource(dataset)
-            logging.info('Now posting to ProductInstance: %s.' % productinstance_resource)
 
             # Get or create a Data remote resource
             logging.info('Determining which Data resource to post to...')
             data_resource = self.get_or_post_data_resource(productinstance_resource, dataset)
 
             # Create a DataInstance remote resource
-            logging.info('Creating a DataInstance resource...')
-            datainstance_resource = self.post_datainstance_resource(data_resource, dataset)
-            logging.info("%s: DataInstance resource created." % datainstance_resource)
+            logging.info('Determining whether DataInstance resource exists...')
+            datainstance_resource = self.get_or_post_post_datainstance_resource(data_resource, dataset)
 
             # Everything has been saved at the remote server
             logging.info("Now publicly available at %s until %s." % (

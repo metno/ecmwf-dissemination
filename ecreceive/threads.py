@@ -9,7 +9,7 @@ import logging.config
 import datetime
 import dateutil.tz
 import argparse
-import ConfigParser
+import configparser
 import zmq
 import threading
 import inotify.adapters
@@ -46,7 +46,7 @@ class ZMQThread(threading.Thread):
 
     def kill_main_thread(self):
         logging.info("The thread crashed! I'm bringing down the entire application!")
-        self.killswitch.send('KILL')
+        self.killswitch.send_string('KILL')
 
     def run(self):
         ecreceive.run_with_exception_logging(self.run_inner)
@@ -96,7 +96,7 @@ class DirectoryWatcherThread(ZMQThread):
         self.spool_directory = spool_directory
         try:
             self.inotify = inotify.adapters.Inotify()
-            self.inotify.add_watch(self.spool_directory)
+            self.inotify.add_watch(self.spool_directory.encode('ascii'))
         except:
             raise ecreceive.exceptions.ECReceiveException('Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % self.spool_directory)
 
@@ -110,10 +110,10 @@ class DirectoryWatcherThread(ZMQThread):
         if 'IN_CLOSE_WRITE' not in attribs:
             return
         logging.info('Filesystem has IN_CLOSE_WRITE event for %s' % filename)
-        if not filename.endswith('.md5'):
+        if not filename.endswith(b'.md5'):
             logging.info('Ignoring non-md5sum input file.')
             return
-        self.socket.send(filename)
+        self.socket.send_string(filename)
 
     def run_inner(self):
         """
@@ -161,20 +161,19 @@ class WorkerThread(ZMQThread):
             kwargs['productstatus_service_backend'],
             kwargs['productstatus_source'],
             kwargs['spool_directory'],
-            kwargs['destination_directory'],
             self.productstatus_api,
         )
 
     def run_inner(self):
         logging.info('Worker thread started')
         while True:
-            request = self.socket.recv()
+            request = self.socket.recv_string()
             logging.info('Received processing request: %s' % request)
             try:
                 self.publisher.process_file(request)
             except ecreceive.exceptions.TryAgainException:
                 logging.error('Processing of %s was disrupted; resubmitting to queue' % request)
-                self.resubmit_socket.send(request)
+                self.resubmit_socket.send_string(request)
 
 
 class DistributionThread(ZMQThread):
@@ -223,7 +222,7 @@ class MainThread(object):
         for f in files:
             f = os.path.basename(f)
             logging.info('Sending process request for dataset: %s' % f)
-            self.job_submit_socket.send(f)
+            self.job_submit_socket.send_string(f)
         logging.info('Finished processing %s.' % directory)
 
     def process_incomplete_checkpoints(self, directories):
@@ -243,8 +242,6 @@ class MainThread(object):
         self.argument_parser = argparse.ArgumentParser()
         self.argument_parser.add_argument('--config', action='store', required=True,
                                           help='Path to configuration file')
-        self.argument_parser.add_argument('--clean', action='store_true',
-                                          help='Clean up old files in destination directory')
 
         # Parse command-line arguments.
         self.args = self.argument_parser.parse_args()
@@ -255,7 +252,7 @@ class MainThread(object):
         logging.info('Starting up ECMWF dissemination receiver.')
 
         # Read configuration file.
-        self.config_parser = ConfigParser.SafeConfigParser()
+        self.config_parser = configparser.SafeConfigParser()
         self.config_parser.read(self.args.config)
 
         # Collect parameters for the worker threads.
@@ -264,71 +261,12 @@ class MainThread(object):
             'productstatus_username': self.config_parser.get('productstatus', 'username'),
             'productstatus_api_key': self.config_parser.get('productstatus', 'api_key'),
             'productstatus_verify_ssl': self.config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_uuid'),
-            'productstatus_source': self.config_parser.get('productstatus', 'source_uuid'),
+            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_key'),
+            'productstatus_source': self.config_parser.get('productstatus', 'source_key'),
             'base_url': self.config_parser.get('productstatus', 'datainstance_base_url'),
             'file_lifetime': self.config_parser.getint('productstatus', 'datainstance_lifetime'),
-            'destination_directory': self.config_parser.get('ecreceive', 'destination_directory'),
             'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
         }
-
-    def clean(self):
-        """!
-        @brief Clean up old files in destination directory.
-        """
-        logging.info('Cleaning up old files in destination directory %s',
-                     self.kwargs['destination_directory'])
-
-        # Instantiate API client
-        api = productstatus.api.Api(
-            self.kwargs['productstatus_url'],
-            username=self.kwargs['productstatus_username'],
-            api_key=self.kwargs['productstatus_api_key'],
-            verify_ssl=self.kwargs['productstatus_verify_ssl'],
-        )
-
-        # Get a queryset of all expired files
-        logging.info('Fetching a list of all expired DataInstance resources in my storage...')
-        now = datetime.datetime.now().replace(tzinfo=dateutil.tz.tzutc())
-        datainstances = api.datainstance.objects.filter(
-            data__productinstance__product__source=api.institution[self.kwargs['productstatus_source']],
-            servicebackend=api.servicebackend[self.kwargs['productstatus_service_backend']],
-            expires__lte=now,
-            deleted=False,
-        ).order_by('-expires')
-
-        # Loop through and delete expired files
-        index = 0
-        total = datainstances.count()
-        logging.info('Found a total of %d expired resources, will now delete them.', total)
-        for datainstance in datainstances:
-            logging.info('[%d/%d] %s, URL %s',
-                         index + 1,
-                         total,
-                         datainstance,
-                         datainstance.url)
-            path = datainstance.url.replace(self.kwargs['base_url'], '').lstrip('/')
-            path = os.path.join(self.kwargs['destination_directory'], path)
-
-            try:
-                dataset = ecreceive.dataset.Dataset(path)
-                dataset.delete()
-
-                logging.info("Registering deletion with Productstatus...")
-                datainstance.deleted = True
-                ecreceive.retry_n(
-                    datainstance.save,
-                    exceptions=(
-                        productstatus.exceptions.ServiceUnavailableException,
-                        ecreceive.exceptions.ECReceiveProductstatusException
-                    )
-                )
-
-                index += 1
-
-            except Exception, e:
-                logging.critical("Error when deleting file '%s': %s", path, e)
-                raise
 
     def main(self):
 
@@ -361,7 +299,6 @@ class MainThread(object):
 
         # Run unfinished processing
         self.process_incomplete_checkpoints([
-            self.kwargs['destination_directory'],
             self.kwargs['spool_directory'],
         ])
         self.process_directory(self.kwargs['spool_directory'])
@@ -370,7 +307,7 @@ class MainThread(object):
         # ZMQ_KILL_SOCKET, or an exception is triggered.
         try:
             logging.info('ECMWF dissemination receiver daemon ready.')
-            killswitch.recv()
+            killswitch.recv_string()
         except KeyboardInterrupt:
             pass
 
@@ -379,14 +316,8 @@ class MainThread(object):
         # Read configuration.
         self.setup_configuration()
 
-        # Determine which function to run
-        if self.args.clean:
-            func = self.clean
-        else:
-            func = self.main
-
         # Catch and log all exceptions
-        rc = ecreceive.run_with_exception_logging(func)
+        rc = ecreceive.run_with_exception_logging(self.main)
 
         # Kill threads
         logging.info('Received shutdown signal, waiting %d seconds for each thread to complete...' % THREAD_GRACE)

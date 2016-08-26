@@ -10,7 +10,7 @@ from mock import MagicMock, Mock
 from nose.tools import raises
 
 
-def make_bogus_datasetpublisher(checkpoint, in_dir, out_dir):
+def make_bogus_datasetpublisher(checkpoint, in_dir):
     return ecreceive.dataset.DatasetPublisher(
         checkpoint,
         "http://hei.ho/",
@@ -18,7 +18,6 @@ def make_bogus_datasetpublisher(checkpoint, in_dir, out_dir):
         None,
         None,
         in_dir,
-        out_dir,
         None,
     )
 
@@ -26,59 +25,57 @@ def make_bogus_datasetpublisher(checkpoint, in_dir, out_dir):
 def setup_dirs():
     tmp_dir = tempfile.mkdtemp()
     in_dir = os.path.join(tmp_dir, "in")
-    out_dir = os.path.join(tmp_dir, "out")
 
     os.mkdir(in_dir)
-    os.mkdir(out_dir)
 
     cp = MagicMock()
-    return in_dir, out_dir, cp
+    return in_dir, cp
 
 
 def test_process_only_data():
-    in_dir, out_dir, cp = setup_dirs()
-    dsp = make_bogus_datasetpublisher(cp, in_dir, out_dir)
+    in_dir, cp = setup_dirs()
+    dsp = make_bogus_datasetpublisher(cp, in_dir)
 
     data_name = os.path.join(in_dir, "foo")
     with open(data_name, 'wb') as data:
-        data.write('test\n')
+        data.write(b'test\n')
 
     dsp.process_file(data_name)
 
 
 def test_process_only_md5():
-    in_dir, out_dir, cp = setup_dirs()
-    dsp = make_bogus_datasetpublisher(cp, in_dir, out_dir)
+    in_dir, cp = setup_dirs()
+    dsp = make_bogus_datasetpublisher(cp, in_dir)
 
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + '.md5'
     with open(md5_name, 'wb') as md5:
-        md5.write('d8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
+        md5.write(b'd8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 
 
 @raises(ecreceive.exceptions.InvalidFilenameException)
 def test_process_bad_fileformat():
-    in_dir, out_dir, cp = setup_dirs()
-    dsp = make_bogus_datasetpublisher(cp, in_dir, out_dir)
+    in_dir, cp = setup_dirs()
+    dsp = make_bogus_datasetpublisher(cp, in_dir)
 
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + '.md5'
     with open(data_name, 'wb') as data:
-        data.write('test\n')
+        data.write(b'test\n')
     with open(md5_name, 'wb') as md5:
-        md5.write('d8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
+        md5.write(b'd8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 
 
 def test_process_data():
-    in_dir, out_dir, cp = setup_dirs()
+    in_dir, cp = setup_dirs()
 
     mock_datainstance = MagicMock()
     mock_productstatus_api = MagicMock()
-    mock_productstatus_api.datainstance.create = Mock(return_value=mock_datainstance)
+    mock_productstatus_api.datainstance.find_or_create = Mock(return_value=mock_datainstance)
 
     productstatus_service_backend = '1234-1234-4321-4321'
     productstatus_source = '0303-9090-6060-4040'
@@ -91,7 +88,6 @@ def test_process_data():
         productstatus_service_backend,
         productstatus_source,
         in_dir,
-        out_dir,
         mock_productstatus_api,
     )
 
@@ -99,15 +95,13 @@ def test_process_data():
     data_name = os.path.join(in_dir, data_filename)
     md5_name = data_name + '.md5'
     with open(data_name, 'wb') as data:
-        data.write('test\n')
+        data.write(b'test\n')
     with open(md5_name, 'wb') as md5:
-        md5.write('d8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
+        md5.write(b'd8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 
-    mock_productstatus_api.dataformat.objects.filter.assert_called_once_with(name='GRIB')
-    assert mock_datainstance.url == base_url + data_filename
-    assert mock_datainstance.save.called
+    assert mock_productstatus_api.datainstance.find_or_create.called
 
 
 class MyProblem(Exception):
