@@ -113,7 +113,7 @@ class DirectoryWatcherThread(ZMQThread):
         if not filename.endswith(b'.md5'):
             logging.info('Ignoring non-md5sum input file.')
             return
-        self.socket.send_string(filename)
+        self.socket.send_string(filename.decode('utf-8'))
 
     def run_inner(self):
         """
