@@ -13,11 +13,10 @@ config = {
     'install_requires': [
         'nose==1.3.7',
         'inotify==0.2.4',
-        'python-dateutil==2.4.2',
+        'python-dateutil==2.5.0',
         'productstatus-client==5.1.0',
         'mock==1.3.0',
         'funcsigs==0.4',
-        'pyzmq==15.1.0',
     ],
     'packages': [],
     'scripts': [],
