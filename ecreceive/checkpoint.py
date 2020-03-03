@@ -13,29 +13,34 @@ class Checkpoint(object):
     This class creates a state file, which keeps a key/value store of Datasets
     and their states.
     """
+
     def __init__(self, path):
         self._states = {}
         self._path = path
         self.load()
 
     def save(self):
-        data = json.dumps(self._states, sort_keys=True, indent=4, separators=(',', ': '))
+        data = json.dumps(
+            self._states, sort_keys=True, indent=4, separators=(",", ": ")
+        )
         try:
-            with open(self._path, 'w') as f:
+            with open(self._path, "w") as f:
                 f.write(data)
         except IOError:
-            logging.error('State file %s cannot be written' % self._path)
+            logging.error("State file %s cannot be written" % self._path)
             raise
 
     def load(self):
         self._states = {}
         try:
-            with open(self._path, 'r') as f:
+            with open(self._path, "r") as f:
                 data = f.read()
             if data:
                 self._states = json.loads(data)
         except IOError:
-            logging.info('State file %s does not exist, starting from scratch' % self._path)
+            logging.info(
+                "State file %s does not exist, starting from scratch" % self._path
+            )
 
     def keys(self):
         return self._states.keys()

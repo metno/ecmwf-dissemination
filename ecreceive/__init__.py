@@ -23,13 +23,13 @@ def parse_filename_timestamp(stamp, now):
     The year is not part of the filename, and must be guessed.
     Returns a datetime object, or None if only underscores are given.
     """
-    if stamp == '________':
+    if stamp == "________":
         return None
-    stamp = '%d%s' % (now.year, stamp)
+    stamp = "%d%s" % (now.year, stamp)
     try:
-        ts = datetime.datetime.strptime(stamp, '%Y%m%d%H%M')
+        ts = datetime.datetime.strptime(stamp, "%Y%m%d%H%M")
     except ValueError:
-        ts = datetime.datetime.strptime(stamp, '%Y%m%d____')
+        ts = datetime.datetime.strptime(stamp, "%Y%m%d____")
     ts = force_utc(ts)
 
     # Check whether the dataset timestamp contains a different month than the
@@ -77,7 +77,7 @@ def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_
         except exceptions, e:
             tries += 1
             if give_up > 0 and tries >= give_up:
-                logging.error('Action failed %d times, giving up: %s' % (give_up, e))
+                logging.error("Action failed %d times, giving up: %s" % (give_up, e))
                 return False
             if tries >= error:
                 logfunc = logging.error
@@ -85,5 +85,5 @@ def retry_n(func, interval=5, exceptions=(Exception,), warning=1, error=3, give_
                 logfunc = logging.warning
             else:
                 logfunc = logging.info
-            logfunc('Action failed, retrying in %d seconds: %s' % (interval, e))
+            logfunc("Action failed, retrying in %d seconds: %s" % (interval, e))
             time.sleep(interval)

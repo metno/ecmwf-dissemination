@@ -22,13 +22,13 @@ import productstatus.api
 
 
 # Listen for kill signals from other threads
-ZMQ_KILL_SOCKET = 'tcp://127.0.0.1:9960'
+ZMQ_KILL_SOCKET = "tcp://127.0.0.1:9960"
 # Pool of threads
-ZMQ_WORKERS_SOCKET = 'tcp://127.0.0.1:9970'
+ZMQ_WORKERS_SOCKET = "tcp://127.0.0.1:9970"
 # Where to submit jobs to the thread pool
-ZMQ_JOB_SUBMIT_SOCKET = 'tcp://127.0.0.1:9980'
+ZMQ_JOB_SUBMIT_SOCKET = "tcp://127.0.0.1:9980"
 # Where to send log file messages
-ZMQ_CHECKPOINT_SOCKET = 'tcp://127.0.0.1:9990'
+ZMQ_CHECKPOINT_SOCKET = "tcp://127.0.0.1:9990"
 # How many seconds to wait for running threads to complete
 THREAD_GRACE = 0
 
@@ -46,7 +46,7 @@ class ZMQThread(threading.Thread):
 
     def kill_main_thread(self):
         logging.info("The thread crashed! I'm bringing down the entire application!")
-        self.killswitch.send('KILL')
+        self.killswitch.send("KILL")
 
     def run(self):
         ecreceive.run_with_exception_logging(self.run_inner)
@@ -59,10 +59,11 @@ class CheckpointThread(ZMQThread):
     checkpoint file. All operations are handled serially, making the file
     operation thread safe.
     """
+
     def __init__(self, checkpoint_file):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.name = 'CheckpointThread'
+        self.name = "CheckpointThread"
         self.checkpoint_file = checkpoint_file
         self.checkpoint = ecreceive.checkpoint.Checkpoint(self.checkpoint_file)
         self.setup_zmq()
@@ -70,12 +71,12 @@ class CheckpointThread(ZMQThread):
         self.socket.bind(ZMQ_CHECKPOINT_SOCKET)
 
     def run_inner(self):
-        logging.info('Checkpoint thread started on %s' % ZMQ_CHECKPOINT_SOCKET)
+        logging.info("Checkpoint thread started on %s" % ZMQ_CHECKPOINT_SOCKET)
         self.checkpoint.unlock_all()
-        logging.info('All transactions unlocked.')
+        logging.info("All transactions unlocked.")
         while True:
             request = self.socket.recv_json()
-            logging.info('Received checkpoint request: %s' % request)
+            logging.info("Received checkpoint request: %s" % request)
             func = getattr(self.checkpoint, request[0])
             rc = func(*request[1:])
             self.socket.send_json(rc)
@@ -86,10 +87,11 @@ class DirectoryWatcherThread(ZMQThread):
     This thread runs inotify on the spool directory, emitting a message each
     time an event is received.
     """
+
     def __init__(self, spool_directory):
         threading.Thread.__init__(self)
         self.daemon = True
-        self.name = 'DirectoryWatcherThread'
+        self.name = "DirectoryWatcherThread"
         self.setup_zmq()
         self.socket = self.context.socket(zmq.PUSH)
         self.socket.connect(ZMQ_JOB_SUBMIT_SOCKET)
@@ -98,7 +100,10 @@ class DirectoryWatcherThread(ZMQThread):
             self.inotify = inotify.adapters.Inotify()
             self.inotify.add_watch(self.spool_directory)
         except:
-            raise ecreceive.exceptions.ECReceiveException('Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % self.spool_directory)
+            raise ecreceive.exceptions.ECReceiveException(
+                "Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?"
+                % self.spool_directory
+            )
 
     def process_inotify_event(self, event):
         """
@@ -107,11 +112,11 @@ class DirectoryWatcherThread(ZMQThread):
         if event is None:
             return
         header, attribs, path, filename = event
-        if 'IN_CLOSE_WRITE' not in attribs:
+        if "IN_CLOSE_WRITE" not in attribs:
             return
-        logging.info('Filesystem has IN_CLOSE_WRITE event for %s' % filename)
-        if not filename.endswith('.md5'):
-            logging.info('Ignoring non-md5sum input file.')
+        logging.info("Filesystem has IN_CLOSE_WRITE event for %s" % filename)
+        if not filename.endswith(".md5"):
+            logging.info("Ignoring non-md5sum input file.")
             return
         self.socket.send(filename)
 
@@ -129,6 +134,7 @@ class WorkerThread(ZMQThread):
     communication. The number of started threads is defined in the
     configuration file.
     """
+
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
@@ -147,33 +153,35 @@ class WorkerThread(ZMQThread):
 
         # Productstatus client
         self.productstatus_api = productstatus.api.Api(
-            kwargs['productstatus_url'],
-            username=kwargs['productstatus_username'],
-            api_key=kwargs['productstatus_api_key'],
-            verify_ssl=kwargs['productstatus_verify_ssl'],
+            kwargs["productstatus_url"],
+            username=kwargs["productstatus_username"],
+            api_key=kwargs["productstatus_api_key"],
+            verify_ssl=kwargs["productstatus_verify_ssl"],
         )
 
         # Dataset processing and publishing
         self.publisher = ecreceive.dataset.DatasetPublisher(
             self.checkpoint_socket,
-            kwargs['base_url'],
-            kwargs['file_lifetime'],
-            kwargs['productstatus_service_backend'],
-            kwargs['productstatus_source'],
-            kwargs['spool_directory'],
-            kwargs['destination_directory'],
+            kwargs["base_url"],
+            kwargs["file_lifetime"],
+            kwargs["productstatus_service_backend"],
+            kwargs["productstatus_source"],
+            kwargs["spool_directory"],
+            kwargs["destination_directory"],
             self.productstatus_api,
         )
 
     def run_inner(self):
-        logging.info('Worker thread started')
+        logging.info("Worker thread started")
         while True:
             request = self.socket.recv()
-            logging.info('Received processing request: %s' % request)
+            logging.info("Received processing request: %s" % request)
             try:
                 self.publisher.process_file(request)
             except ecreceive.exceptions.TryAgainException:
-                logging.error('Processing of %s was disrupted; resubmitting to queue' % request)
+                logging.error(
+                    "Processing of %s was disrupted; resubmitting to queue" % request
+                )
                 self.resubmit_socket.send(request)
 
 
@@ -181,9 +189,10 @@ class DistributionThread(ZMQThread):
     """
     This thread shall load balance job processing requests among a collection of threads.
     """
+
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
-        self.name = 'DistributionThread'
+        self.name = "DistributionThread"
         self.daemon = True
 
         self.setup_zmq()
@@ -193,9 +202,11 @@ class DistributionThread(ZMQThread):
         self.clients.bind(ZMQ_JOB_SUBMIT_SOCKET)
 
     def run_inner(self):
-        logging.info('Process submission socket listening on %s' % ZMQ_JOB_SUBMIT_SOCKET)
-        logging.info('Process distribution socket listening on %s' % ZMQ_WORKERS_SOCKET)
-        logging.info('Now distributing processing requests.')
+        logging.info(
+            "Process submission socket listening on %s" % ZMQ_JOB_SUBMIT_SOCKET
+        )
+        logging.info("Process distribution socket listening on %s" % ZMQ_WORKERS_SOCKET)
+        logging.info("Now distributing processing requests.")
         zmq.proxy(self.clients, self.workers)
 
 
@@ -218,33 +229,39 @@ class MainThread(object):
         """
         Process all files in a directory.
         """
-        files = list(glob.iglob(os.path.join(directory, '*.md5')))
-        logging.info('Processing %d datasets in directory %s.' % (len(files), directory))
+        files = list(glob.iglob(os.path.join(directory, "*.md5")))
+        logging.info(
+            "Processing %d datasets in directory %s." % (len(files), directory)
+        )
         for f in files:
             f = os.path.basename(f)
-            logging.info('Sending process request for dataset: %s' % f)
+            logging.info("Sending process request for dataset: %s" % f)
             self.job_submit_socket.send(f)
-        logging.info('Finished processing %s.' % directory)
+        logging.info("Finished processing %s." % directory)
 
     def process_incomplete_checkpoints(self, directories):
         """
         Iterates through files left unprocessed, and does away with them.
         """
-        self.checkpoint_socket.send_json(['keys'])
+        self.checkpoint_socket.send_json(["keys"])
         checkpointed_files = list(self.checkpoint_socket.recv_json())
         n_checkpointed = len(checkpointed_files)
-        logging.info('Processing %d incomplete checkpoints.' % n_checkpointed)
+        logging.info("Processing %d incomplete checkpoints." % n_checkpointed)
         for f in checkpointed_files:
-            logging.info('Sending process request for unfinished dataset: %s' % f)
+            logging.info("Sending process request for unfinished dataset: %s" % f)
             self.job_submit_socket.send_string(f)
-        logging.info('Finished processing incomplete checkpoints.')
+        logging.info("Finished processing incomplete checkpoints.")
 
     def setup_configuration(self):
         self.argument_parser = argparse.ArgumentParser()
-        self.argument_parser.add_argument('--config', action='store', required=True,
-                                          help='Path to configuration file')
-        self.argument_parser.add_argument('--clean', action='store_true',
-                                          help='Clean up old files in destination directory')
+        self.argument_parser.add_argument(
+            "--config", action="store", required=True, help="Path to configuration file"
+        )
+        self.argument_parser.add_argument(
+            "--clean",
+            action="store_true",
+            help="Clean up old files in destination directory",
+        )
 
         # Parse command-line arguments.
         self.args = self.argument_parser.parse_args()
@@ -252,7 +269,7 @@ class MainThread(object):
         # Configure logging.
         logging.config.fileConfig(self.args.config)
 
-        logging.info('Starting up ECMWF dissemination receiver.')
+        logging.info("Starting up ECMWF dissemination receiver.")
 
         # Read configuration file.
         self.config_parser = ConfigParser.SafeConfigParser()
@@ -260,55 +277,77 @@ class MainThread(object):
 
         # Collect parameters for the worker threads.
         self.kwargs = {
-            'productstatus_url': self.config_parser.get('productstatus', 'url'),
-            'productstatus_username': self.config_parser.get('productstatus', 'username'),
-            'productstatus_api_key': self.config_parser.get('productstatus', 'api_key'),
-            'productstatus_verify_ssl': self.config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_uuid'),
-            'productstatus_source': self.config_parser.get('productstatus', 'source_uuid'),
-            'base_url': self.config_parser.get('productstatus', 'datainstance_base_url'),
-            'file_lifetime': self.config_parser.getint('productstatus', 'datainstance_lifetime'),
-            'destination_directory': self.config_parser.get('ecreceive', 'destination_directory'),
-            'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
+            "productstatus_url": self.config_parser.get("productstatus", "url"),
+            "productstatus_username": self.config_parser.get(
+                "productstatus", "username"
+            ),
+            "productstatus_api_key": self.config_parser.get("productstatus", "api_key"),
+            "productstatus_verify_ssl": self.config_parser.getboolean(
+                "productstatus", "verify_ssl"
+            ),
+            "productstatus_service_backend": self.config_parser.get(
+                "productstatus", "service_backend_uuid"
+            ),
+            "productstatus_source": self.config_parser.get(
+                "productstatus", "source_uuid"
+            ),
+            "base_url": self.config_parser.get(
+                "productstatus", "datainstance_base_url"
+            ),
+            "file_lifetime": self.config_parser.getint(
+                "productstatus", "datainstance_lifetime"
+            ),
+            "destination_directory": self.config_parser.get(
+                "ecreceive", "destination_directory"
+            ),
+            "spool_directory": self.config_parser.get("ecreceive", "spool_directory"),
         }
 
     def clean(self):
         """!
         @brief Clean up old files in destination directory.
         """
-        logging.info('Cleaning up old files in destination directory %s',
-                     self.kwargs['destination_directory'])
+        logging.info(
+            "Cleaning up old files in destination directory %s",
+            self.kwargs["destination_directory"],
+        )
 
         # Instantiate API client
         api = productstatus.api.Api(
-            self.kwargs['productstatus_url'],
-            username=self.kwargs['productstatus_username'],
-            api_key=self.kwargs['productstatus_api_key'],
-            verify_ssl=self.kwargs['productstatus_verify_ssl'],
+            self.kwargs["productstatus_url"],
+            username=self.kwargs["productstatus_username"],
+            api_key=self.kwargs["productstatus_api_key"],
+            verify_ssl=self.kwargs["productstatus_verify_ssl"],
         )
 
         # Get a queryset of all expired files
-        logging.info('Fetching a list of all expired DataInstance resources in my storage...')
+        logging.info(
+            "Fetching a list of all expired DataInstance resources in my storage..."
+        )
         now = datetime.datetime.now().replace(tzinfo=dateutil.tz.tzutc())
         datainstances = api.datainstance.objects.filter(
-            data__productinstance__product__source=api.institution[self.kwargs['productstatus_source']],
-            servicebackend=api.servicebackend[self.kwargs['productstatus_service_backend']],
+            data__productinstance__product__source=api.institution[
+                self.kwargs["productstatus_source"]
+            ],
+            servicebackend=api.servicebackend[
+                self.kwargs["productstatus_service_backend"]
+            ],
             expires__lte=now,
             deleted=False,
-        ).order_by('-expires')
+        ).order_by("-expires")
 
         # Loop through and delete expired files
         index = 0
         total = datainstances.count()
-        logging.info('Found a total of %d expired resources, will now delete them.', total)
+        logging.info(
+            "Found a total of %d expired resources, will now delete them.", total
+        )
         for datainstance in datainstances:
-            logging.info('[%d/%d] %s, URL %s',
-                         index + 1,
-                         total,
-                         datainstance,
-                         datainstance.url)
-            path = datainstance.url.replace(self.kwargs['base_url'], '').lstrip('/')
-            path = os.path.join(self.kwargs['destination_directory'], path)
+            logging.info(
+                "[%d/%d] %s, URL %s", index + 1, total, datainstance, datainstance.url
+            )
+            path = datainstance.url.replace(self.kwargs["base_url"], "").lstrip("/")
+            path = os.path.join(self.kwargs["destination_directory"], path)
 
             try:
                 dataset = ecreceive.dataset.Dataset(path)
@@ -320,8 +359,8 @@ class MainThread(object):
                     datainstance.save,
                     exceptions=(
                         productstatus.exceptions.ServiceUnavailableException,
-                        ecreceive.exceptions.ECReceiveProductstatusException
-                    )
+                        ecreceive.exceptions.ECReceiveProductstatusException,
+                    ),
                 )
 
                 index += 1
@@ -333,20 +372,20 @@ class MainThread(object):
     def main(self):
 
         # Set up processing threads.
-        num_threads = self.config_parser.getint('ecreceive', 'worker_threads')
+        num_threads = self.config_parser.getint("ecreceive", "worker_threads")
         for i in range(num_threads):
             thread = WorkerThread(**self.kwargs)
             thread.start()
             self.threads += [thread]
 
         # Set up the checkpoint writer thread.
-        checkpoint_file = self.config_parser.get('ecreceive', 'checkpoint_file')
+        checkpoint_file = self.config_parser.get("ecreceive", "checkpoint_file")
         checkpoint_thread = CheckpointThread(checkpoint_file)
         checkpoint_thread.start()
         self.threads += [checkpoint_thread]
 
         # Set up the inotify thread.
-        inotify_thread = DirectoryWatcherThread(self.kwargs['spool_directory'])
+        inotify_thread = DirectoryWatcherThread(self.kwargs["spool_directory"])
         inotify_thread.start()
         self.threads += [inotify_thread]
 
@@ -360,16 +399,15 @@ class MainThread(object):
         killswitch.bind(ZMQ_KILL_SOCKET)
 
         # Run unfinished processing
-        self.process_incomplete_checkpoints([
-            self.kwargs['destination_directory'],
-            self.kwargs['spool_directory'],
-        ])
-        self.process_directory(self.kwargs['spool_directory'])
+        self.process_incomplete_checkpoints(
+            [self.kwargs["destination_directory"], self.kwargs["spool_directory"],]
+        )
+        self.process_directory(self.kwargs["spool_directory"])
 
         # The program is now running until a signal is received on
         # ZMQ_KILL_SOCKET, or an exception is triggered.
         try:
-            logging.info('ECMWF dissemination receiver daemon ready.')
+            logging.info("ECMWF dissemination receiver daemon ready.")
             killswitch.recv()
         except KeyboardInterrupt:
             pass
@@ -389,11 +427,14 @@ class MainThread(object):
         rc = ecreceive.run_with_exception_logging(func)
 
         # Kill threads
-        logging.info('Received shutdown signal, waiting %d seconds for each thread to complete...' % THREAD_GRACE)
+        logging.info(
+            "Received shutdown signal, waiting %d seconds for each thread to complete..."
+            % THREAD_GRACE
+        )
         for thread in self.threads:
-            logging.info('Killing thread: %s' % thread.name)
+            logging.info("Killing thread: %s" % thread.name)
             thread.join(THREAD_GRACE)
 
-        logging.info('ECMWF dissemination receiver daemon terminating.')
+        logging.info("ECMWF dissemination receiver daemon terminating.")
 
         return rc
