@@ -365,7 +365,7 @@ class MainThread(object):
 
                 index += 1
 
-            except Exception, e:
+            except Exception as e:
                 logging.critical("Error when deleting file '%s': %s", path, e)
                 raise
 

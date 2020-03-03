@@ -452,7 +452,7 @@ class DatasetPublisher(object):
             logging.info(
                 "Calculated md5sum matches reference file: %s." % dataset.md5_result
             )
-        except ecreceive.exceptions.InvalidDataException, e:
+        except ecreceive.exceptions.InvalidDataException as e:
             logging.error("md5sum validation error: %s." % unicode(e))
             self.checkpoint_unlock(dataset)
             return False
@@ -463,7 +463,7 @@ class DatasetPublisher(object):
         ):
             try:
                 dataset.move(self.destination_path)
-            except ecreceive.exceptions.ECReceiveException, e:
+            except ecreceive.exceptions.ECReceiveException as e:
                 logging.error("Error when moving: %s." % unicode(e))
                 raise ecreceive.exceptions.TryAgainException("Dataset cannot be moved")
 
