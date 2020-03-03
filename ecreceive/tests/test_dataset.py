@@ -36,8 +36,8 @@ def setup_temporary_files():
     global dataset
     data = tempfile.NamedTemporaryFile(delete=False)
     md5 = open(data.name + ".md5", "w+b")
-    data.write("test\n")
-    md5.write("d8e8fca2dc0f896fd7cb4cb0031ba249")
+    data.write(b"test\n")
+    md5.write(b"d8e8fca2dc0f896fd7cb4cb0031ba249")
     dataset = ecreceive.dataset.Dataset(data.name)
 
 
@@ -203,7 +203,7 @@ def test_read_md5sum_too_short():
     Test that reading an md5sum file with too little data throws an exception.
     """
     with open(dataset.md5_path, "w+b") as f:
-        f.write("abcdef")
+        f.write(b"abcdef")
     dataset.read_md5sum()
 
 
@@ -245,7 +245,7 @@ def test_invalid():
     Test that validating a data set against a mismatching md5sum returns False.
     """
     with open(dataset.data_path, "w+b") as f:
-        f.write("invalid data")
+        f.write(b"invalid data")
     assert dataset.valid() is False
 
 

@@ -34,7 +34,7 @@ def test_process_only_data():
 
     data_name = os.path.join(in_dir, "foo")
     with open(data_name, "wb") as data:
-        data.write("test\n")
+        data.write(b"test\n")
 
     dsp.process_file(data_name)
 
@@ -46,7 +46,7 @@ def test_process_only_md5():
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + ".md5"
     with open(md5_name, "wb") as md5:
-        md5.write("d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
+        md5.write(b"d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 
@@ -59,9 +59,9 @@ def test_process_bad_fileformat():
     data_name = os.path.join(in_dir, "foo")
     md5_name = data_name + ".md5"
     with open(data_name, "wb") as data:
-        data.write("test\n")
+        data.write(b"test\n")
     with open(md5_name, "wb") as md5:
-        md5.write("d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
+        md5.write(b"d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 
@@ -92,9 +92,9 @@ def test_process_data():
     data_name = os.path.join(in_dir, data_filename)
     md5_name = data_name + ".md5"
     with open(data_name, "wb") as data:
-        data.write("test\n")
+        data.write(b"test\n")
     with open(md5_name, "wb") as md5:
-        md5.write("d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
+        md5.write(b"d8e8fca2dc0f896fd7cb4cb0031ba249")  # md5sum of 'test\n'
 
     dsp.process_file(md5_name)
 

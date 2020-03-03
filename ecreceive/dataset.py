@@ -116,7 +116,7 @@ class Dataset(object):
             raise ecreceive.exceptions.ECReceiveException(
                 "Cannot calculate md5sum without a data file"
             )
-        with open(self.data_path, "r") as f:
+        with open(self.data_path, "rb") as f:
             while True:
                 data = f.read(256 * 128)  # md5 block size is 128
                 if len(data) == 0:
@@ -422,7 +422,7 @@ class DatasetPublisher(object):
 
         # Instantiate Dataset object
         dataset = ecreceive.dataset.Dataset(full_path)
-        logging.info(unicode(dataset))
+        logging.info(dataset)
 
         # Check if both files exist
         if not dataset.complete():

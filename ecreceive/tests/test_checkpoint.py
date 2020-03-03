@@ -48,7 +48,7 @@ def test_load_empty():
     Test that loading an empty checkpoint file does not yield any keys
     and no errors.
     """
-    tmpfile, checkpoint = setup_with_tempfile("{}")
+    tmpfile, checkpoint = setup_with_tempfile(b"{}")
     assert not checkpoint.keys()
     assert checkpoint.get("x") == 0
 
@@ -58,7 +58,7 @@ def test_load_data():
     Test that loading an empty checkpoint file does not yield any keys
     and no errors.
     """
-    tmpfile, checkpoint = setup_with_tempfile('{ "a" : 1, "b" : 2 }')
+    tmpfile, checkpoint = setup_with_tempfile(b'{ "a" : 1, "b" : 2 }')
     assert checkpoint.get("a") == 1
     assert checkpoint.get("b") == 2
     assert checkpoint.get("c") == 0
@@ -68,7 +68,7 @@ def test_add_save():
     """
     Test that adding to a checkpoint stores the new state in memory and file.
     """
-    tmpfile, checkpoint = setup_with_tempfile('{ "a" : 1, "b" : 2 }')
+    tmpfile, checkpoint = setup_with_tempfile(b'{ "a" : 1, "b" : 2 }')
     assert checkpoint.get("a") == 1
     checkpoint.add("a", 1)
     assert checkpoint.get("a") == 1
@@ -83,7 +83,7 @@ def test_delete_save():
     """
     Test that deleting a key from a checkpoint object stores the new state in memory and file.
     """
-    tmpfile, checkpoint = setup_with_tempfile('{"a": 1}')
+    tmpfile, checkpoint = setup_with_tempfile(b'{"a": 1}')
     assert checkpoint.get("a") == 1
 
     checkpoint.delete("a")
@@ -97,7 +97,7 @@ def test_get_nosave():
     """
     Test that get for an unknown key does not stores new state in memory or file.
     """
-    tmpfile, checkpoint = setup_with_tempfile('{"a": 1}')
+    tmpfile, checkpoint = setup_with_tempfile(b'{"a": 1}')
     assert checkpoint.get("b") == 0
 
     cp_reload = ecreceive.checkpoint.Checkpoint(tmpfile.name)
