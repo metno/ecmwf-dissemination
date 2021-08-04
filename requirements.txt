@@ -1,0 +1,5 @@
+inotify>=0.2
+mock>=2
+python_dateutil>=2.5
+pyzmq>=22.1
+productstatus-client>=7.0.0

@@ -4,31 +4,29 @@ Daemon for robust receival of ECMWF dissemination data sets.
 
 ## Setting up a development environment
 
-First, you'll need some dependencies to build the pygrib library:
+We recommend to develop using Python virtual environment:
 
-```
-sudo apt-get install python-virtualenv python-pip build-essential python-dev libxml2-dev libxslt-dev
-```
-
-Change to the repository you just checked out.
-
-Now, create a virtual environment, and activate it:
-
-```
+```bash
 virtualenv deps
 source deps/bin/activate
 ```
 
+or using a virtualenv wrapper (https://virtualenvwrapper.readthedocs.io/en/latest/):
+
+```bash
+mkvirtualenv ecmwf-dissemination
+```
+
 Next, install the ECMWF daemons and their dependencies in the virtual environment:
 
-```
+```bash
 pip install -e .
 ```
 
 Check that the tests pass, then you're done.
 
-```
-nosetests
+```bash
+python -m pytest -vv
 ```
 
 ## Internal messaging
