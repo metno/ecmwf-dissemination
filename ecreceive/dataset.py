@@ -7,6 +7,7 @@ import ecreceive
 import ecreceive.exceptions
 
 import productstatus.exceptions
+import postevent
 
 
 class Dataset(object):
@@ -91,64 +92,11 @@ class Dataset(object):
         else:
             logging.error("md5sum file does not exist: '%s'", self.md5_path)
 
-    def read_md5sum(self):
-        """
-        Read the contents of the md5sum file into memory.
-        """
-        if not self.has_md5_file():
-            raise ecreceive.exceptions.ECReceiveException('Cannot read md5sum without an md5sum file')
-        with open(self.md5_path, 'rb') as f:
-            self.md5_key = f.read(32).decode('ascii')
-            if len(self.md5_key) != 32:
-                raise ecreceive.exceptions.InvalidDataException('md5sum file is less than 32 bytes')
-
-    def calculate_md5sum(self):
-        """
-        Calculate the md5sum of the data file.
-        """
-        h = hashlib.md5()
-        if not self.has_data_file():
-            raise ecreceive.exceptions.ECReceiveException('Cannot calculate md5sum without a data file')
-        with open(self.data_path, 'rb') as f:
-            while True:
-                data = f.read(256*128)  # md5 block size is 128
-                if len(data) == 0:
-                    break
-                h.update(data)
-        self.md5_result = h.hexdigest()
-
-    def valid(self):
-        """
-        Returns True if md5sum matches data file contents.
-        """
-        if not self.md5_key:
-            self.read_md5sum()
-        if not self.md5_result:
-            self.calculate_md5sum()
-        return self.md5_key == self.md5_result
-
-    def md5(self):
-        if not self.md5_result:
-            self.calculate_md5sum()
-        return self.md5_result
-
     def data_filename(self):
         """
         Return the filename part of the data file path.
         """
         return os.path.basename(self.data_path)
-
-    def move(self, destination):
-        """
-        Move both files in the dataset to a different directory.
-        """
-        if not self.complete():
-            raise ecreceive.exceptions.ECReceiveException('Dataset must be complete before moving it')
-        for member in ['data_path', 'md5_path']:
-            path = getattr(self, member)
-            destination_path = os.path.join(destination, os.path.basename(path))
-            os.rename(path, destination_path)
-            setattr(self, member, destination_path)
 
     def __repr__(self):
         """
@@ -209,7 +157,7 @@ class Dataset(object):
 
     def analysis_end_time(self):
         """
-        Return the analysis end time of this dataset, according to the filename.
+        Return the forecast time of this dataset, according to the filename.
         """
         self.parse_filename(datetime.datetime.now())
         return self.filename_components['analysis_end_time']
@@ -375,6 +323,20 @@ class DatasetPublisher(object):
         }
         return self.productstatus.datainstance.find_or_create(parameters, extra_params=extra_params)
 
+    
+    def post_to_mms(self, dataset):
+        """
+        Register this file with MMS
+        """
+        name = dataset.name()        
+        reftime = dataset.analysis_start_time()
+        file_type = dataset.file_type()
+        full_path = 'file://' + self.ecreceive_base_url + dataset.data_filename()
+        
+        # Skip next_expected_in_minutes?
+        postevent.postevent(product=name, url='file://' + full_path, reftime=reftime, format=file_type) 
+        logging.info('Posting file://%s to MMS' % full_path)
+        
     def process_file(self, filename):
         """
         Run the recvd business logic on a file; see class description.
@@ -405,6 +367,8 @@ class DatasetPublisher(object):
         # Register a checkpoint for this dataset to indicate that it exists
         self.checkpoint_add(dataset, ecreceive.checkpoint.CHECKPOINT_DATASET_EXISTS)
 
+        self.post_to_mms(dataset)
+        
         # Obtain Productstatus IDs for this product instance, and submit data files
         def productstatus_submit():
 
