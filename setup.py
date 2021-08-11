@@ -18,7 +18,7 @@ config = {
         'mock==1.3.0',
         'funcsigs==0.4',
         'pyzmq==15.1.0',
-        'postevent',
+        'py-mms',
     ],
     'packages': [],
     'scripts': [],
