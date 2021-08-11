@@ -2,12 +2,15 @@ import os
 import hashlib
 import logging
 import datetime
+import random
+import time
 
 import ecreceive
 import ecreceive.exceptions
 
 import productstatus.exceptions
-import postevent
+
+from pymms import ProductEvent, MMSError
 
 
 class Dataset(object):
@@ -323,20 +326,51 @@ class DatasetPublisher(object):
         }
         return self.productstatus.datainstance.find_or_create(parameters, extra_params=extra_params)
 
-    
-    def post_to_mms(self, dataset):
+    def post_to_mms(self, dataset, tryno):
         """
         Register this file with MMS
         """
-        name = dataset.name()        
-        reftime = dataset.analysis_start_time()
+        mms_url = self.mms_url
+        
+        name = dataset.name()
+        ref_time = dataset.analysis_start_time()
         file_type = dataset.file_type()
         full_path = 'file://' + self.ecreceive_base_url + dataset.data_filename()
+
+        create_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
         
-        # Skip next_expected_in_minutes?
-        postevent.postevent(product=name, url='file://' + full_path, reftime=reftime, format=file_type) 
+        # If this is a retry, sleep a random number of seconds:
+        if tryno > 0:
+            random.seed()
+            sleep_sec = tryno * random.randint(1,20)
+            time.sleep(sleep_sec)
+
+        ### Should we mark server in jobname?
+        mms_event = ProductEvent(
+            JobName = "ecreceive-" + name,
+            Product = name,
+            ProductionHub = mms_url,
+            ProductLocation = full_path,
+            Counter = 1,
+            TotalCount = 1,
+            RefTime = ref_time,
+            CreatedAt = create_time,
+            # NextEventAt = ,  # What to do with this?
+            )
+
+        try:
+            ret = mms_event.send()
+        except MMSError as err:
+            print(f"Error: {err}")
+            # Retry 
+            if tryno <= 3:
+                tryno += 1
+                self.post_to_mms(dataset, tryno)
+            else:
+                logging.info("Gives up, what to do now?")
+        
         logging.info('Posting file://%s to MMS' % full_path)
-        
+    
     def process_file(self, filename):
         """
         Run the recvd business logic on a file; see class description.
@@ -367,7 +401,7 @@ class DatasetPublisher(object):
         # Register a checkpoint for this dataset to indicate that it exists
         self.checkpoint_add(dataset, ecreceive.checkpoint.CHECKPOINT_DATASET_EXISTS)
 
-        self.post_to_mms(dataset)
+        self.post_to_mms(dataset, 0)
         
         # Obtain Productstatus IDs for this product instance, and submit data files
         def productstatus_submit():
