@@ -1,4 +1,4 @@
-py-mms @ git+https://github.com/metno/py-mms@aa85fbfe58b58ffbd705c3fe332aaee06cd4c302
+pymms @ git+https://github.com/metno/py-mms@aa85fbfe58b58ffbd705c3fe332aaee06cd4c302
 inotify>=0.2
 mock>=2
 python_dateutil>=2.5
