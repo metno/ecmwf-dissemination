@@ -1,6 +1,6 @@
 pymms @ git+https://github.com/metno/py-mms@aa85fbfe58b58ffbd705c3fe332aaee06cd4c302
 inotify>=0.2
 mock>=2
-python_dateutil>=2.5
+python-dateutil>=2.5
 pyzmq>=22.1
 productstatus-client>=7.0.0
