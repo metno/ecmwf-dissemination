@@ -17,6 +17,12 @@ or using a virtualenv wrapper (https://virtualenvwrapper.readthedocs.io/en/lates
 mkvirtualenv ecmwf-dissemination
 ```
 
+Install dependencies
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
 Next, install the ECMWF daemons and their dependencies in the virtual environment:
 
 ```bash
@@ -26,7 +32,7 @@ pip install -e .
 Check that the tests pass, then you're done.
 
 ```bash
-python -m pytest -vv
+nosetests
 ```
 
 ## Internal messaging
