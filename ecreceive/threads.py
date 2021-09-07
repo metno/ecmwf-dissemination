@@ -249,14 +249,7 @@ class MainThread(object):
 
         # Collect parameters for the worker threads.
         self.kwargs = {
-            'productstatus_url': self.config_parser.get('productstatus', 'url'),
-            'productstatus_username': self.config_parser.get('productstatus', 'username'),
-            'productstatus_api_key': self.config_parser.get('productstatus', 'api_key'),
-            'productstatus_verify_ssl': self.config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_key'),
-            'productstatus_source': self.config_parser.get('productstatus', 'source_key'),
-            'base_url': self.config_parser.get('productstatus', 'datainstance_base_url'),
-            'file_lifetime': self.config_parser.getint('productstatus', 'datainstance_lifetime'),
+            'mms_url': self.config_parser.get('mms', 'url'),
             'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
         }
 
