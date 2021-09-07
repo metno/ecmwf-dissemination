@@ -5,6 +5,11 @@ import ecreceive
 import ecreceive.dataset
 import ecreceive.exceptions
 
+import pytest
+
+from pymms import ProductEvent, MMSError
+
+
 # for python3: from unittest.mock import MagicMock, Mock
 from mock import MagicMock, Mock
 from nose.tools import raises
@@ -16,9 +21,8 @@ def make_bogus_datasetpublisher(checkpoint, in_dir):
         "http://hei.ho/",
         120,
         None,
-        None,
         in_dir,
-        None,
+        "http://local.mms"
     )
 
 
@@ -70,38 +74,34 @@ def test_process_bad_fileformat():
     dsp.process_file(md5_name)
 
 
-def test_process_data():
+def test_process_data(monkeypatch):
     in_dir, cp = setup_dirs()
 
-    mock_datainstance = MagicMock()
-    mock_productstatus_api = MagicMock()
-    mock_productstatus_api.datainstance.find_or_create = Mock(return_value=mock_datainstance)
+    with monkeypatch.context() as mp:
+        mp.setattr(ProductEvent, "send", lambda *a: None)
 
-    productstatus_service_backend = '1234-1234-4321-4321'
-    productstatus_source = '0303-9090-6060-4040'
-    base_url = "http://hei.ho/"
+        productstatus_source = '0303-9090-6060-4040'
+        base_url = "http://hei.ho/"
+        mms_url = "http://localmms"
 
-    dsp = ecreceive.dataset.DatasetPublisher(
-        cp,
-        base_url,
-        120,
-        productstatus_service_backend,
-        productstatus_source,
-        in_dir,
-        mock_productstatus_api,
-    )
+        dsp = ecreceive.dataset.DatasetPublisher(
+            cp,
+            base_url,
+            120,
+            productstatus_source,
+            in_dir,
+            mms_url,
+        )
 
-    data_filename = "BFS11120600111511001"
-    data_name = os.path.join(in_dir, data_filename)
-    md5_name = data_name + '.md5'
-    with open(data_name, 'wb') as data:
-        data.write(b'test\n')
-    with open(md5_name, 'wb') as md5:
-        md5.write(b'd8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
+        data_filename = "BFS11120600111511001"
+        data_name = os.path.join(in_dir, data_filename)
+        md5_name = data_name + '.md5'
+        with open(data_name, 'wb') as data:
+            data.write(b'test\n')
+        with open(md5_name, 'wb') as md5:
+            md5.write(b'd8e8fca2dc0f896fd7cb4cb0031ba249')  # md5sum of 'test\n'
 
-    dsp.process_file(md5_name)
-
-    assert mock_productstatus_api.datainstance.find_or_create.called
+        dsp.process_file(md5_name)
 
 
 class MyProblem(Exception):
