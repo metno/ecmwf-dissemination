@@ -124,7 +124,7 @@ class DirectoryWatcherThread(ZMQThread):
 
 class WorkerThread(ZMQThread):
     """
-    This thread runs the actual data processing and Productstatus
+    This thread runs the actual data processing and MMS
     communication. The number of started threads is defined in the
     configuration file.
     """
@@ -149,8 +149,6 @@ class WorkerThread(ZMQThread):
         self.publisher = ecreceive.dataset.DatasetPublisher(
             self.checkpoint_socket,
             kwargs['base_url'],
-            kwargs['file_lifetime'],
-            kwargs['productstatus_source'],
             kwargs['spool_directory'],
             kwargs['mms_url'],
         )

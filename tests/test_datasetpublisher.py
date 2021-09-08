@@ -19,8 +19,6 @@ def make_bogus_datasetpublisher(checkpoint, in_dir):
     return ecreceive.dataset.DatasetPublisher(
         checkpoint,
         "http://hei.ho/",
-        120,
-        None,
         in_dir,
         "http://local.mms"
     )
@@ -80,15 +78,12 @@ def test_process_data(monkeypatch):
     with monkeypatch.context() as mp:
         mp.setattr(ProductEvent, "send", lambda *a: None)
 
-        productstatus_source = '0303-9090-6060-4040'
         base_url = "http://hei.ho/"
         mms_url = "http://localmms"
 
         dsp = ecreceive.dataset.DatasetPublisher(
             cp,
             base_url,
-            120,
-            productstatus_source,
             in_dir,
             mms_url,
         )

@@ -260,17 +260,13 @@ class DatasetPublisher(object):
     def __init__(self,
                  checkpoint_socket,
                  ecreceive_base_url,
-                 dataset_lifetime,
-                 productstatus_source_key,
                  spool_path,
                  mms_url,
                  ):
 
         self.ecreceive_base_url = ecreceive_base_url
-        self.dataset_lifetime = datetime.timedelta(minutes=dataset_lifetime)
         self.spool_path = spool_path
         self.checkpoint_socket = checkpoint_socket
-        self.productstatus_source_key = productstatus_source_key
         self.mms_url = mms_url
         self.hostname = socket.gethostname()
 

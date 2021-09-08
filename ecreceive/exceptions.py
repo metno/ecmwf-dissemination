@@ -1,14 +1,6 @@
 class ECReceiveException(Exception):
     pass
 
-
-class ECReceiveProductstatusException(ECReceiveException):
-    """
-    Thrown when there is insufficient data available at the Productstatus server.
-    """
-    pass
-
-
 class InvalidDataException(ECReceiveException):
     pass
 
