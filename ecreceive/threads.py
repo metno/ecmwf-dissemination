@@ -94,7 +94,7 @@ class DirectoryWatcherThread(ZMQThread):
         self.spool_directory = spool_directory
         try:
             self.inotify = inotify.adapters.Inotify()
-            self.inotify.add_watch(self.spool_directory.encode('ascii'))
+            self.inotify.add_watch(self.spool_directory)
         except:
             raise ecreceive.exceptions.ECReceiveException(
                 'Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % self.spool_directory)
