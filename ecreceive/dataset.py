@@ -259,12 +259,10 @@ class DatasetPublisher(object):
 
     def __init__(self,
                  checkpoint_socket,
-                 ecreceive_base_url,
                  spool_path,
                  mms_url,
                  ):
 
-        self.ecreceive_base_url = ecreceive_base_url
         self.spool_path = spool_path
         self.checkpoint_socket = checkpoint_socket
         self.mms_url = mms_url
@@ -330,7 +328,7 @@ class DatasetPublisher(object):
 
             name = dataset.name()
             ref_time = dataset.analysis_start_time()
-            full_path = 'file://' + self.ecreceive_base_url + dataset.data_filename()
+            full_path = 'file://' + self.spool_path + dataset.data_filename()
 
             # Should we mark server in jobname?
             mms_event = ProductEvent(

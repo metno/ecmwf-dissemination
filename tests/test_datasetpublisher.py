@@ -18,7 +18,6 @@ from nose.tools import raises
 def make_bogus_datasetpublisher(checkpoint, in_dir):
     return ecreceive.dataset.DatasetPublisher(
         checkpoint,
-        "http://hei.ho/",
         in_dir,
         "http://local.mms"
     )
@@ -78,12 +77,10 @@ def test_process_data(monkeypatch):
     with monkeypatch.context() as mp:
         mp.setattr(ProductEvent, "send", lambda *a: None)
 
-        base_url = "http://hei.ho/"
         mms_url = "http://localmms"
 
         dsp = ecreceive.dataset.DatasetPublisher(
             cp,
-            base_url,
             in_dir,
             mms_url,
         )

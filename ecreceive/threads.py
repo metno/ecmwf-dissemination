@@ -148,7 +148,6 @@ class WorkerThread(ZMQThread):
         # Dataset processing and publishing
         self.publisher = ecreceive.dataset.DatasetPublisher(
             self.checkpoint_socket,
-            kwargs['base_url'],
             kwargs['spool_directory'],
             kwargs['mms_url'],
         )
