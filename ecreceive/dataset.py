@@ -328,7 +328,7 @@ class DatasetPublisher(object):
 
             name = dataset.name()
             ref_time = dataset.analysis_start_time()
-            full_path = 'file://' + self.spool_path + dataset.data_filename()
+            full_path = 'file://' + self.spool_path + '/' + dataset.data_filename()
 
             # Should we mark server in jobname?
             mms_event = ProductEvent(
@@ -341,13 +341,13 @@ class DatasetPublisher(object):
                 refTime = ref_time,
             )
 
-            logging.info('Posting information about file://%s to MMS' % full_path)
+            logging.info('Posting information about %s to MMS' % full_path)
             try:
                 mms_event.send()
             except MMSError as err:
                 logging.info("Posting to MMS failed: %s" % err)
 
-                logging.info('file://%s information posted to MMS' % full_path)
+                logging.info('%s information posted to MMS' % full_path)
 
             # All done
             self.checkpoint_delete(dataset)
