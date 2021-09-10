@@ -6,8 +6,6 @@ import os
 import glob
 import logging
 import logging.config
-import datetime
-import dateutil.tz
 import argparse
 import configparser
 import zmq
@@ -17,8 +15,6 @@ import inotify.adapters
 import ecreceive
 import ecreceive.dataset
 import ecreceive.checkpoint
-
-import productstatus.api
 
 
 # Listen for kill signals from other threads
@@ -59,6 +55,7 @@ class CheckpointThread(ZMQThread):
     checkpoint file. All operations are handled serially, making the file
     operation thread safe.
     """
+
     def __init__(self, checkpoint_file):
         threading.Thread.__init__(self)
         self.daemon = True
@@ -86,6 +83,7 @@ class DirectoryWatcherThread(ZMQThread):
     This thread runs inotify on the spool directory, emitting a message each
     time an event is received.
     """
+
     def __init__(self, spool_directory):
         threading.Thread.__init__(self)
         self.daemon = True
@@ -96,9 +94,10 @@ class DirectoryWatcherThread(ZMQThread):
         self.spool_directory = spool_directory
         try:
             self.inotify = inotify.adapters.Inotify()
-            self.inotify.add_watch(self.spool_directory.encode('ascii'))
+            self.inotify.add_watch(self.spool_directory)
         except:
-            raise ecreceive.exceptions.ECReceiveException('Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % self.spool_directory)
+            raise ecreceive.exceptions.ECReceiveException(
+                'Something went wrong when setting up the inotify watch for %s. Does the directory exist, and do you have correct permissions?' % self.spool_directory)
 
     def process_inotify_event(self, event):
         """
@@ -125,10 +124,11 @@ class DirectoryWatcherThread(ZMQThread):
 
 class WorkerThread(ZMQThread):
     """
-    This thread runs the actual data processing and Productstatus
+    This thread runs the actual data processing and MMS
     communication. The number of started threads is defined in the
     configuration file.
     """
+
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         self.daemon = True
@@ -145,23 +145,11 @@ class WorkerThread(ZMQThread):
         self.resubmit_socket = self.context.socket(zmq.PUSH)
         self.resubmit_socket.connect(ZMQ_JOB_SUBMIT_SOCKET)
 
-        # Productstatus client
-        self.productstatus_api = productstatus.api.Api(
-            kwargs['productstatus_url'],
-            username=kwargs['productstatus_username'],
-            api_key=kwargs['productstatus_api_key'],
-            verify_ssl=kwargs['productstatus_verify_ssl'],
-        )
-
         # Dataset processing and publishing
         self.publisher = ecreceive.dataset.DatasetPublisher(
             self.checkpoint_socket,
-            kwargs['base_url'],
-            kwargs['file_lifetime'],
-            kwargs['productstatus_service_backend'],
-            kwargs['productstatus_source'],
             kwargs['spool_directory'],
-            self.productstatus_api,
+            kwargs['mms_url'],
         )
 
     def run_inner(self):
@@ -180,6 +168,7 @@ class DistributionThread(ZMQThread):
     """
     This thread shall load balance job processing requests among a collection of threads.
     """
+
     def __init__(self, **kwargs):
         threading.Thread.__init__(self)
         self.name = 'DistributionThread'
@@ -257,14 +246,7 @@ class MainThread(object):
 
         # Collect parameters for the worker threads.
         self.kwargs = {
-            'productstatus_url': self.config_parser.get('productstatus', 'url'),
-            'productstatus_username': self.config_parser.get('productstatus', 'username'),
-            'productstatus_api_key': self.config_parser.get('productstatus', 'api_key'),
-            'productstatus_verify_ssl': self.config_parser.getboolean('productstatus', 'verify_ssl'),
-            'productstatus_service_backend': self.config_parser.get('productstatus', 'service_backend_key'),
-            'productstatus_source': self.config_parser.get('productstatus', 'source_key'),
-            'base_url': self.config_parser.get('productstatus', 'datainstance_base_url'),
-            'file_lifetime': self.config_parser.getint('productstatus', 'datainstance_lifetime'),
+            'mms_url': self.config_parser.get('mms', 'url'),
             'spool_directory': self.config_parser.get('ecreceive', 'spool_directory'),
         }
 

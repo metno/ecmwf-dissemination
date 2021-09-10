@@ -1,12 +1,13 @@
-import os
+import datetime
 import hashlib
 import logging
-import datetime
+import os
+import socket
 
 import ecreceive
 import ecreceive.exceptions
 
-import productstatus.exceptions
+from pymms import ProductEvent, MMSError
 
 
 class Dataset(object):
@@ -58,39 +59,6 @@ class Dataset(object):
             raise ecreceive.exceptions.ECReceiveException('Cannot derive a data path from a non-md5sum path')
         return path[:-4]
 
-    def has_data_file(self):
-        """
-        Returns True if the specified md5sum file exists along with a data file, False otherwise.
-        """
-        return os.path.exists(self.data_path)
-
-    def has_md5_file(self):
-        """
-        Returns True if the specified data file exists along with an md5sum file, False otherwise.
-        """
-        return os.path.exists(self.md5_path)
-
-    def complete(self):
-        """
-        Returns True if both files in the dataset exists, False otherwise.
-        """
-        return self.has_data_file() and self.has_md5_file()
-
-    def delete(self):
-        """!
-        @brief Delete both files in the dataset.
-        """
-        if self.has_data_file():
-            logging.info("Deleted data file: '%s'", self.data_path)
-            os.unlink(self.data_path)
-        else:
-            logging.error("Data file does not exist: '%s'", self.data_path)
-        if self.has_md5_file():
-            logging.info("Deleted md5sum file: '%s'", self.md5_path)
-            os.unlink(self.md5_path)
-        else:
-            logging.error("md5sum file does not exist: '%s'", self.md5_path)
-
     def read_md5sum(self):
         """
         Read the contents of the md5sum file into memory.
@@ -131,6 +99,39 @@ class Dataset(object):
         if not self.md5_result:
             self.calculate_md5sum()
         return self.md5_result
+
+    def has_data_file(self):
+        """
+        Returns True if the specified md5sum file exists along with a data file, False otherwise.
+        """
+        return os.path.exists(self.data_path)
+
+    def has_md5_file(self):
+        """
+        Returns True if the specified data file exists along with an md5sum file, False otherwise.
+        """
+        return os.path.exists(self.md5_path)
+
+    def complete(self):
+        """
+        Returns True if both files in the dataset exists, False otherwise.
+        """
+        return self.has_data_file() and self.has_md5_file()
+
+    def delete(self):
+        """!
+        @brief Delete both files in the dataset.
+        """
+        if self.has_data_file():
+            logging.info("Deleted data file: '%s'", self.data_path)
+            os.unlink(self.data_path)
+        else:
+            logging.error("Data file does not exist: '%s'", self.data_path)
+        if self.has_md5_file():
+            logging.info("Deleted md5sum file: '%s'", self.md5_path)
+            os.unlink(self.md5_path)
+        else:
+            logging.error("md5sum file does not exist: '%s'", self.md5_path)
 
     def data_filename(self):
         """
@@ -209,7 +210,7 @@ class Dataset(object):
 
     def analysis_end_time(self):
         """
-        Return the analysis end time of this dataset, according to the filename.
+        Return the forecast time of this dataset, according to the filename.
         """
         self.parse_filename(datetime.datetime.now())
         return self.filename_components['analysis_end_time']
@@ -244,35 +245,28 @@ class Dataset(object):
 
 class DatasetPublisher(object):
     """
-    Publish datasets from an 'incoming' directory to a Productstatus server.
+    Publish event to MMS when dataset is received in the 'incoming' directory
 
     When a file is processed, the class checks whether the file is a) weather
     model data or b) its corresponding md5sum file. If both files exists, the
     pair is submitted for the following processing:
 
         1. Extract file information
-        2. Post dataset to the Productstatus service
+        2. Post dataset to the MMS
 
     After processing is complete, the class forgets about the files.
     """
 
     def __init__(self,
                  checkpoint_socket,
-                 ecreceive_base_url,
-                 dataset_lifetime,
-                 productstatus_service_backend_key,
-                 productstatus_source_key,
                  spool_path,
-                 productstatus_api,
+                 mms_url,
                  ):
 
-        self.ecreceive_base_url = ecreceive_base_url
-        self.dataset_lifetime = datetime.timedelta(minutes=dataset_lifetime)
         self.spool_path = spool_path
         self.checkpoint_socket = checkpoint_socket
-        self.productstatus = productstatus_api
-        self.productstatus_service_backend_key = productstatus_service_backend_key
-        self.productstatus_source_key = productstatus_source_key
+        self.mms_url = mms_url
+        self.hostname = socket.gethostname()
 
     def get_dataset_key(self, dataset):
         return dataset.data_filename()
@@ -298,82 +292,6 @@ class DatasetPublisher(object):
 
     def checkpoint_unlock(self, dataset):
         return self.checkpoint_zeromq_rpc('unlock', self.get_dataset_key(dataset))
-
-    def get_productstatus_dataformat(self, dataset):
-        """
-        Given a Dataset object, return a DataFormat object pointing to the
-        correct data format.
-        """
-        file_type = dataset.file_type()
-        try:
-            resource = self.productstatus.dataformat[file_type]
-        except productstatus.exceptions.ResourceNotFoundException:
-            raise ecreceive.exceptions.ECReceiveProductstatusException(
-                "Data format '%s' was not found on the Productstatus server" % file_type
-            )
-        logging.info('%s: Productstatus dataformat for %s' % (resource, file_type))
-        return resource
-
-    def get_productstatus_product(self, dataset):
-        """
-        Given a Dataset object, return a matching Product resource at the
-        Productstatus server, or None if no matching product is found.
-        """
-        name = dataset.name()
-        qs = self.productstatus.product.objects.filter(
-            source_key=name,
-            source=self.productstatus.institution[self.productstatus_source_key]
-        )
-        name_desc = "ECMWF stream name '%s'" % name
-        if qs.count() == 0:
-            raise ecreceive.exceptions.ECReceiveProductstatusException(
-                "Product defined from %s was not found on the Productstatus server" % name_desc
-            )
-        resource = qs[0]
-        logging.info("%s: Productstatus Product for %s" % (resource, name_desc))
-        return resource
-
-    def get_or_post_productinstance_resource(self, dataset):
-        """
-        Return a matching ProductInstance resource according to Product, reference time and version.
-        """
-        product = self.get_productstatus_product(dataset)
-        parameters = {
-            'product': product,
-            'reference_time': dataset.analysis_start_time(),
-            'version': dataset.version()
-        }
-        return self.productstatus.productinstance.find_or_create(parameters)
-
-    def get_or_post_data_resource(self, productinstance, dataset):
-        """
-        Return a matching Data resource according to ProductInstance and data file
-        begin/end times.
-        We are using time_period_begin = time_period_end = The forecast for hour time_period_end
-        """
-        parameters = {
-            'productinstance': productinstance,
-            'time_period_begin': dataset.analysis_end_time(),
-            'time_period_end': dataset.analysis_end_time(),
-        }
-        return self.productstatus.data.find_or_create(parameters)
-
-    def get_or_post_datainstance_resource(self, data, dataset):
-        """
-        Create a DataInstance resource at the Productstatus server, referring to the
-        given data set.
-        """
-        parameters = {
-            'data': data,
-            'format': self.get_productstatus_dataformat(dataset),
-            'servicebackend': self.productstatus.servicebackend[self.productstatus_service_backend_key],
-            'url': self.ecreceive_base_url + dataset.data_filename(),
-            'deleted': False,
-        }
-        extra_params = {
-            'expires': ecreceive.force_utc(datetime.datetime.utcnow()) + self.dataset_lifetime,
-        }
-        return self.productstatus.datainstance.find_or_create(parameters, extra_params=extra_params)
 
     def process_file(self, filename):
         """
@@ -405,26 +323,31 @@ class DatasetPublisher(object):
         # Register a checkpoint for this dataset to indicate that it exists
         self.checkpoint_add(dataset, ecreceive.checkpoint.CHECKPOINT_DATASET_EXISTS)
 
-        # Obtain Productstatus IDs for this product instance, and submit data files
-        def productstatus_submit():
+        def post_to_mms():
+            mms_url = self.mms_url
 
-            # Get or create a ProductInstance remote resource
-            logging.info('Determining which ProductInstance to post to...')
-            productinstance_resource = self.get_or_post_productinstance_resource(dataset)
+            name = dataset.name()
+            ref_time = dataset.analysis_start_time().isoformat()
+            full_path = 'file://' + self.spool_path + '/' + dataset.data_filename()
 
-            # Get or create a Data remote resource
-            logging.info('Determining which Data resource to post to...')
-            data_resource = self.get_or_post_data_resource(productinstance_resource, dataset)
+            # Should we mark server in jobname?
+            mms_event = ProductEvent(
+                jobName = self.hostname,
+                product = name,
+                productionHub = mms_url,
+                productLocation = full_path,
+                counter = 1,
+                totalCount = 1,
+                refTime = ref_time,
+            )
 
-            # Create a DataInstance remote resource
-            logging.info('Determining whether DataInstance resource exists...')
-            datainstance_resource = self.get_or_post_datainstance_resource(data_resource, dataset)
+            logging.info('Posting information about %s to MMS' % full_path)
+            try:
+                mms_event.send()
+            except MMSError as err:
+                logging.info("Posting to MMS failed: %s" % err)
 
-            # Everything has been saved at the remote server
-            logging.info("Now publicly available at %s until %s." % (
-                datainstance_resource.url,
-                datainstance_resource.expires.strftime('%Y-%m-%dT%H:%M:%S%z'),
-            ))
+                logging.info('%s information posted to MMS' % full_path)
 
             # All done
             self.checkpoint_delete(dataset)
@@ -434,10 +357,9 @@ class DatasetPublisher(object):
 
         # Run the above function indefinitely
         rc = ecreceive.retry_n(
-            productstatus_submit,
+            post_to_mms,
             exceptions=(
-                productstatus.exceptions.ServiceUnavailableException,
-                ecreceive.exceptions.ECReceiveProductstatusException
+                MMSError,
             )
         )
         if rc:
