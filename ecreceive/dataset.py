@@ -327,7 +327,7 @@ class DatasetPublisher(object):
             mms_url = self.mms_url
 
             name = dataset.name()
-            ref_time = dataset.analysis_start_time()
+            ref_time = dataset.analysis_start_time().isoformat()
             full_path = 'file://' + self.spool_path + '/' + dataset.data_filename()
 
             # Should we mark server in jobname?
